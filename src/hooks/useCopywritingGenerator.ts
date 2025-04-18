@@ -57,3 +57,4 @@ export const useCopywritingGenerator = () => {
 
   return { generateCopywriting, isLoading };
 };
+

@@ -12,7 +12,7 @@ export const CopywritingForm: React.FC = () => {
     productDescription: ''
   });
 
-  const { generateCopywriting, isLoading, generatedText } = useCopywritingGenerator();
+  const { generateCopywriting, isLoading } = useCopywritingGenerator();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,13 +53,7 @@ export const CopywritingForm: React.FC = () => {
           {isLoading ? 'Generating...' : 'Generate Copywriting'}
         </Button>
       </form>
-
-      {generatedText && (
-        <div className="mt-4 p-4 bg-gray-100 rounded">
-          <h3 className="font-bold mb-2">Generated Copywriting:</h3>
-          <p>{generatedText}</p>
-        </div>
-      )}
     </div>
   );
 };
+
