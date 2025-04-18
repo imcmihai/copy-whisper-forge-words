@@ -15,15 +15,18 @@ serve(async (req) => {
   }
 
   try {
-    const { niche, productName, productDescription } = await req.json();
+    const { originalText, userInstructions, previousMessages } = await req.json();
 
-    const prompt = `Acționezi ca un copywriter profesionist cu ani de experiență. Creează un text de copywriting convingător pentru următorul produs:
+    // Create the conversation context
+    const messages = [
+      { 
+        role: 'system', 
+        content: `Acționezi ca un copywriter profesionist cu ani de experiență care ajută la îmbunătățirea textelor de marketing. 
+Analizează cererea utilizatorului și ajustează textul original în funcție de această cerere. 
+Răspunde doar cu noua versiune a textului, fără explicații suplimentare.
 
-Nișă: ${niche}
-Nume Produs: ${productName}
-Descriere Produs: ${productDescription}
+Folosește următoarele principii în revizuirea textului:
 
-Folosește următoarele principii în crearea textului:
 1. Prioritizează impactul și claritatea mesajului
 2. Structurează conținutul pentru lizibilitate maximă
 3. Folosește creativitate și storytelling
@@ -33,9 +36,24 @@ Folosește următoarele principii în crearea textului:
 7. Aprofundează conexiunea emoțională
 8. Include call-to-action puternice
 9. Folosește limbaj senzorial și descriptiv
-10. Personalizează mesajul pentru audiență
+10. Personalizează mesajul pentru audiență` 
+      }
+    ];
 
-Textul trebuie să fie în limba română și să fie structurat într-un format ușor de citit.`;
+    // Add conversation history
+    if (previousMessages && previousMessages.length > 0) {
+      for (const msg of previousMessages) {
+        messages.push({
+          role: msg.isUser ? 'user' : 'assistant',
+          content: msg.content
+        });
+      }
+    }
+
+    // Add the current user request
+    messages.push({ role: 'user', content: `Te rog să revizuiești acest text în baza următoarelor instrucțiuni: ${userInstructions}` });
+
+    console.log("Sending request to OpenAI with messages:", JSON.stringify(messages));
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -45,17 +63,20 @@ Textul trebuie să fie în limba română și să fie structurat într-un format
       },
       body: JSON.stringify({
         model: 'gpt-4o-mini', // Using the cheaper model to be cost-effective
-        messages: [
-          { role: 'system', content: 'You are a professional copywriter with years of experience in creating compelling marketing copy.' },
-          { role: 'user', content: prompt }
-        ],
+        messages: messages,
       }),
     });
 
     const data = await response.json();
-    const generatedText = data.choices[0].message.content;
+    
+    if (!response.ok) {
+      console.error('OpenAI API error:', data);
+      throw new Error(data.error?.message || 'Unknown error from OpenAI');
+    }
+    
+    const revisedText = data.choices[0].message.content;
 
-    return new Response(JSON.stringify({ generatedText }), {
+    return new Response(JSON.stringify({ revisedText }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
