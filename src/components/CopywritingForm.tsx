@@ -56,4 +56,3 @@ export const CopywritingForm: React.FC = () => {
     </div>
   );
 };
-
