@@ -64,6 +64,8 @@ Folosește următoarele principii în revizuirea textului:
       body: JSON.stringify({
         model: 'gpt-4o-mini', // Using the cheaper model to be cost-effective
         messages: messages,
+        temperature: 0.7, // Slightly creative but still controlled
+        max_tokens: 1000, // Limit token usage
       }),
     });
 
