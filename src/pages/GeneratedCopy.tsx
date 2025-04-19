@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
@@ -30,7 +29,6 @@ const GeneratedCopy = () => {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
-    // Scroll to bottom whenever messages change
     if (scrollAreaRef.current) {
       const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
       if (scrollContainer) {
@@ -57,7 +55,7 @@ const GeneratedCopy = () => {
   if (!generatedText) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#1A052E] to-[#2D0A4E] p-4">
-        <Card className="w-full max-w-2xl p-6 bg-[#3a1465]/40 backdrop-blur-md border border-purple-500/20 shadow-[0_0_15px_rgba(157,78,221,0.3)]">
+        <Card className="w-full max-w-2xl p-6 glassmorphism border-purple-500/20">
           <p className="text-center text-gray-300">No generated text available.</p>
         </Card>
       </div>
@@ -72,14 +70,12 @@ const GeneratedCopy = () => {
     const userMessage = inputValue;
     setInputValue('');
     
-    // Add user message to chat
     const newUserMessageId = Date.now().toString();
     setMessages(prev => [...prev, { id: newUserMessageId, content: userMessage, isUser: true }]);
     
     setIsLoading(true);
     
     try {
-      // Call the edge function to update the copywriting based on user feedback
       const { data, error } = await supabase.functions.invoke('revise-copywriting', {
         body: {
           originalText: generatedText,
@@ -90,7 +86,6 @@ const GeneratedCopy = () => {
       
       if (error) throw error;
       
-      // Add AI response to chat
       setMessages(prev => [...prev, { 
         id: (Date.now() + 1).toString(), 
         content: data.revisedText, 
@@ -111,14 +106,14 @@ const GeneratedCopy = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#1A052E] to-[#2D0A4E] p-4">
       <div className="max-w-4xl mx-auto h-[90vh] flex flex-col">
-        <Card className="flex-1 flex flex-col overflow-hidden border-purple-500/20 bg-[#3a1465]/40 backdrop-blur-md shadow-[0_0_25px_rgba(157,78,221,0.3)]">
-          <div className="p-4 border-b border-purple-500/30 bg-[#4A1A82] text-white">
-            <h1 className="text-xl font-bold flex items-center gap-2">
+        <Card className="flex-1 flex flex-col overflow-hidden border-purple-500/20 glassmorphism">
+          <div className="p-4 border-b border-purple-500/30 bg-[#4A1A82]/60 backdrop-blur-md">
+            <h1 className="text-xl font-bold flex items-center gap-2 text-white">
               <span className="relative">
                 <Bot className="h-6 w-6 text-[#FF2EE6]" />
                 <span className="absolute w-2 h-2 bg-[#00FFCC] rounded-full -top-1 -right-1 animate-pulse"></span>
               </span>
-              Copywriting Assistant
+              AI Copywriting Assistant
             </h1>
           </div>
           <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
@@ -132,8 +127,8 @@ const GeneratedCopy = () => {
                     className={cn(
                       "max-w-[85%] p-4 rounded-2xl flex group relative transition-all duration-300", 
                       message.isUser 
-                        ? "bg-[#6C22BD] text-white rounded-tr-none shadow-[0_0_10px_rgba(108,34,189,0.3)]" 
-                        : "bg-[#3a1465]/60 backdrop-blur-md border border-purple-500/20 rounded-tl-none shadow-[0_0_10px_rgba(157,78,221,0.3)]"
+                        ? "bg-[#6C22BD] text-white rounded-tr-none neon-glow" 
+                        : "glassmorphism rounded-tl-none neon-border"
                     )}
                   >
                     <div className="absolute top-2 -left-8 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -182,22 +177,24 @@ const GeneratedCopy = () => {
               )}
             </div>
           </ScrollArea>
-          <form onSubmit={handleSendMessage} className="p-4 border-t border-purple-500/30 flex gap-2 bg-[#3a1465]/40 backdrop-blur-md">
-            <Input
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              placeholder="Type your revision request..."
-              disabled={isLoading}
-              className="flex-1 bg-[#2D0A4E]/60 border-purple-500/30 focus-visible:ring-[#FF2EE6] text-white placeholder:text-gray-400"
-            />
-            <Button 
-              type="submit" 
-              size="icon" 
-              disabled={isLoading}
-              className="bg-[#FF2EE6] hover:bg-[#FF2EE6]/80 text-white shadow-[0_0_15px_rgba(255,46,230,0.4)]"
-            >
-              <Send className="h-4 w-4" />
-            </Button>
+          <form onSubmit={handleSendMessage} className="p-4 border-t border-purple-500/30 glassmorphism">
+            <div className="flex gap-2">
+              <Input
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                placeholder="Type your revision request..."
+                disabled={isLoading}
+                className="flex-1 bg-[#2D0A4E]/60 border-purple-500/30 focus-visible:ring-[#FF2EE6] text-white placeholder:text-gray-400 backdrop-blur-md"
+              />
+              <Button 
+                type="submit" 
+                size="icon" 
+                disabled={isLoading}
+                className="bg-[#FF2EE6] hover:bg-[#FF2EE6]/80 text-white neon-glow"
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            </div>
           </form>
         </Card>
       </div>
