@@ -17,6 +17,11 @@ interface Message {
   isUser: boolean;
 }
 
+interface ChatHistory {
+  id: string;
+  title: string;
+}
+
 const GeneratedCopy = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -29,7 +34,7 @@ const GeneratedCopy = () => {
   });
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [chats, setChats] = useState<{ id: string; title: string }[]>([]);
+  const [chats, setChats] = useState<ChatHistory[]>([]);
   const [currentChat, setCurrentChat] = useState<string | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   
@@ -121,7 +126,7 @@ const GeneratedCopy = () => {
             user_id: user?.id, 
             title: userMessage.length > 50 ? userMessage.slice(0, 50) + '...' : userMessage 
           })
-          .select('id')
+          .select('id, title')
           .single();
 
         if (chatError) {
