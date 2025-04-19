@@ -1,13 +1,15 @@
+
 import { useState, useRef, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Bot, User, Copy, RefreshCw } from 'lucide-react';
+import { Send, Bot, User, Copy, RefreshCw, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
+import { Sidebar, SidebarContent, SidebarGroup, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar';
 
 interface Message {
   id: string;
@@ -17,6 +19,7 @@ interface Message {
 
 const GeneratedCopy = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { generatedText } = location.state || { generatedText: null };
   const [messages, setMessages] = useState<Message[]>(() => {
     if (generatedText) {
@@ -26,8 +29,35 @@ const GeneratedCopy = () => {
   });
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [chats, setChats] = useState<{ id: string; title: string }[]>([]);
+  const [currentChat, setCurrentChat] = useState<string | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   
+  useEffect(() => {
+    const fetchChats = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        navigate('/auth');
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('chat_history')
+        .select('id, title')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching chats:', error);
+        return;
+      }
+
+      setChats(data || []);
+    };
+
+    fetchChats();
+  }, [navigate]);
+
   useEffect(() => {
     if (scrollAreaRef.current) {
       const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
@@ -51,16 +81,6 @@ const GeneratedCopy = () => {
       });
     });
   };
-
-  if (!generatedText) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#1A052E] to-[#2D0A4E] p-4">
-        <Card className="w-full max-w-2xl p-6 glassmorphism border-purple-500/20">
-          <p className="text-center text-gray-300">No generated text available.</p>
-        </Card>
-      </div>
-    );
-  }
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,6 +111,39 @@ const GeneratedCopy = () => {
         content: data.revisedText, 
         isUser: false 
       }]);
+
+      // Save chat if it's the first message
+      if (!currentChat) {
+        const { data: { user } } = await supabase.auth.getUser();
+        const { data: chatData, error: chatError } = await supabase
+          .from('chat_history')
+          .insert({ 
+            user_id: user?.id, 
+            title: userMessage.length > 50 ? userMessage.slice(0, 50) + '...' : userMessage 
+          })
+          .select('id')
+          .single();
+
+        if (chatError) {
+          console.error('Error creating chat:', chatError);
+          return;
+        }
+
+        setCurrentChat(chatData.id);
+        setChats(prev => [{ id: chatData.id, title: chatData.title }, ...prev]);
+      }
+
+      // Save messages to chat_messages
+      const { error: messageError } = await supabase
+        .from('chat_messages')
+        .insert([
+          { chat_id: currentChat, content: userMessage, role: 'user' },
+          { chat_id: currentChat, content: data.revisedText, role: 'assistant' }
+        ]);
+
+      if (messageError) {
+        console.error('Error saving messages:', messageError);
+      }
     } catch (error) {
       console.error('Error revising copywriting:', error);
       toast({
@@ -103,11 +156,63 @@ const GeneratedCopy = () => {
     }
   };
 
+  const handleChatSelect = async (chatId: string) => {
+    setCurrentChat(chatId);
+
+    const { data, error } = await supabase
+      .from('chat_messages')
+      .select('content, role')
+      .eq('chat_id', chatId)
+      .order('created_at');
+
+    if (error) {
+      console.error('Error fetching chat messages:', error);
+      return;
+    }
+
+    const chatMessages = data.map((msg, index) => ({
+      id: `${index + 1}`,
+      content: msg.content,
+      isUser: msg.role === 'user'
+    }));
+
+    setMessages(chatMessages);
+  };
+
+  if (!generatedText) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#1A052E] to-[#2D0A4E] p-4">
+        <Card className="w-full max-w-2xl p-6 glassmorphism border-purple-500/20">
+          <p className="text-center text-gray-300">No generated text available.</p>
+        </Card>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#1A052E] to-[#2D0A4E] p-4">
-      <div className="max-w-4xl mx-auto h-[90vh] flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-[#1A052E] to-[#2D0A4E] p-4 flex">
+      <Sidebar>
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarMenu>
+              {chats.map((chat) => (
+                <SidebarMenuItem key={chat.id}>
+                  <SidebarMenuButton 
+                    onClick={() => handleChatSelect(chat.id)}
+                    isActive={chat.id === currentChat}
+                  >
+                    {chat.title}
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroup>
+        </SidebarContent>
+      </Sidebar>
+      
+      <div className="flex-1 ml-4 max-w-4xl mx-auto h-[90vh] flex flex-col">
         <Card className="flex-1 flex flex-col overflow-hidden border-purple-500/20 glassmorphism">
-          <div className="p-4 border-b border-purple-500/30 bg-[#4A1A82]/60 backdrop-blur-md">
+          <div className="p-4 border-b border-purple-500/30 bg-[#4A1A82]/60 backdrop-blur-md flex justify-between items-center">
             <h1 className="text-xl font-bold flex items-center gap-2 text-white">
               <span className="relative">
                 <Bot className="h-6 w-6 text-[#FF2EE6]" />
@@ -125,9 +230,9 @@ const GeneratedCopy = () => {
                 >
                   <div 
                     className={cn(
-                      "max-w-[85%] p-4 rounded-2xl flex group relative transition-all duration-300", 
+                      "max-w-[85%] p-4 rounded-2xl flex group relative transition-all duration-300 text-white", 
                       message.isUser 
-                        ? "bg-[#6C22BD] text-white rounded-tr-none neon-glow" 
+                        ? "bg-[#6C22BD] rounded-tr-none neon-glow" 
                         : "glassmorphism rounded-tl-none neon-border"
                     )}
                   >
@@ -161,7 +266,7 @@ const GeneratedCopy = () => {
               ))}
               {isLoading && (
                 <div className="flex justify-start">
-                  <div className="max-w-[85%] p-4 rounded-2xl bg-[#3a1465]/60 backdrop-blur-md border border-purple-500/20 rounded-tl-none shadow-[0_0_10px_rgba(157,78,221,0.3)]">
+                  <div className="max-w-[85%] p-4 rounded-2xl bg-[#3a1465]/60 backdrop-blur-md border border-purple-500/20 rounded-tl-none shadow-[0_0_10px_rgba(157,78,221,0.3)] text-white">
                     <div className="flex items-center gap-3">
                       <div className="flex-shrink-0 h-8 w-8 rounded-full bg-[#4A1A82] flex items-center justify-center">
                         <RefreshCw className="h-5 w-5 text-[#FF2EE6] animate-spin" />
