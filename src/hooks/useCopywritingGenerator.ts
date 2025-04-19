@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -18,47 +17,71 @@ export const useCopywritingGenerator = () => {
     setIsLoading(true);
 
     try {
-      // Check if user is logged in
+      // Check if user is logged in to determine if we should save data
       const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        // If not logged in, redirect to auth page and store form data
-        toast({
-          title: 'Authentication Required',
-          description: 'Please log in to generate copywriting'
-        });
-        
-        // Store the input in sessionStorage to use it after auth
-        sessionStorage.setItem('pendingCopywritingInput', JSON.stringify(input));
-        navigate('/auth');
-        return;
-      }
+      const isLoggedIn = !!session;
+      const userId = session?.user?.id;
 
+      // Invoke the function to generate text
       const { data: generatedData, error: openAiError } = await supabase.functions.invoke('generate-copywriting', {
         body: input
       });
 
       if (openAiError) throw openAiError;
+      
+      // --- Save data ONLY if logged in ---
+      if (isLoggedIn && userId) {
+        try {
+          // Save generated text
+          const { error: dbError } = await supabase
+            .from('copywriting_texts')
+            .insert({
+              user_id: userId, // Make sure user_id column exists
+              niche: input.niche,
+              product_name: input.productName,
+              product_description: input.productDescription,
+              generated_text: generatedData.generatedText
+            });
+          if (dbError) throw dbError; // Throw if text saving fails
 
-      const { data: dbData, error: dbError } = await supabase
-        .from('copywriting_texts')
-        .insert({
-          niche: input.niche,
-          product_name: input.productName,
-          product_description: input.productDescription,
-          generated_text: generatedData.generatedText
-        })
-        .select()
-        .single();
-
-      if (dbError) throw dbError;
+          // Update profile
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .upsert({
+              user_id: userId,
+              niche: input.niche, 
+              product_name: input.productName,
+              product_description: input.productDescription,
+              updated_at: new Date()
+            }, { onConflict: 'user_id' });
+            
+          if (profileError) {
+            console.warn('Failed to update profile after generation:', profileError);
+            // Don't block navigation for profile update failure, maybe a subtle toast?
+          }
+        } catch (saveError) {
+           console.error('Error saving generated text or profile:', saveError);
+           toast({
+             title: 'Save Error',
+             description: 'Failed to save the generated text history.',
+             variant: 'destructive'
+           });
+           // Decide if we should still navigate or stop here if saving is critical
+        }
+      } // --- End of saving logic ---
 
       toast({
         title: 'Copywriting Generated',
         description: 'Your copywriting text has been created successfully!'
       });
 
-      navigate('/generated-copy', { state: { generatedText: generatedData.generatedText } });
+      // Navigate for everyone
+      navigate('/generated-copy', { 
+        state: { 
+          generatedText: generatedData.generatedText,
+          initialInput: input
+        } 
+      });
     } catch (error) {
       console.error('Copywriting generation error:', error);
       toast({

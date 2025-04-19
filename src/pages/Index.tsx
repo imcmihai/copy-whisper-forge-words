@@ -1,77 +1,83 @@
-
 import { CopywritingForm } from '@/components/CopywritingForm';
-import { Sparkles, LogIn, UserPlus } from 'lucide-react';
+import { Sparkles, LogIn, UserPlus, User as UserIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { User } from '@supabase/supabase-js';
 
 const Index = () => {
-  const [user, setUser] = useState<User | null>(null);
   const navigate = useNavigate();
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user ?? null);
-      
-      // If user has just signed in, redirect to generated-copy
-      if (event === 'SIGNED_IN') {
-        navigate('/generated-copy');
-      }
-    });
+    let isMounted = true;
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
+    const fetchSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (isMounted) {
+        setCurrentUser(session?.user ?? null);
+      }
+    };
+    
+    fetchSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+       if (isMounted) {
+         setCurrentUser(session?.user ?? null);
+       }
     });
 
     return () => {
+      isMounted = false;
       subscription.unsubscribe();
     };
-  }, [navigate]);
-
-  const handleLogin = () => {
-    navigate('/auth');
-  };
-
-  const handleSignUp = () => {
-    navigate('/auth?mode=signup');
-  };
+  }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#1A052E] to-[#2D0A4E] p-4 flex items-center justify-center">
-      <div className="w-full max-w-md relative">
-        <div className="absolute inset-0 bg-gradient-to-r from-[#FF2EE6] via-[#6C22BD] to-[#00FFCC] opacity-30 blur-3xl animate-gradient" />
+    <div className="min-h-screen bg-gradient-to-br from-[#1A052E] to-[#2D0A4E] p-4 flex flex-col items-center justify-center relative">
+      <div className="absolute top-4 right-4 z-20 flex gap-2">
+        {currentUser ? (
+          <Button 
+            onClick={() => navigate('/profile')} 
+            variant="ghost"
+            size="icon"
+            className="text-purple-300 hover:text-white hover:bg-purple-500/20 rounded-full"
+            title="Go to Profile"
+          >
+            <UserIcon className="h-5 w-5" />
+          </Button>
+        ) : (
+          <>
+            <Button 
+              onClick={() => navigate('/auth')}
+              variant="outline" 
+              className="bg-[#3a1465]/40 text-white hover:bg-[#4A1A82]/60 border-purple-500/30"
+            >
+              <LogIn className="mr-2 h-4 w-4" /> Login
+            </Button>
+            <Button 
+              onClick={() => navigate('/auth?mode=signup')}
+              className="bg-gradient-to-r from-[#FF2EE6] to-[#00FFCC] text-white hover:opacity-90 shadow-[0_0_10px_rgba(255,46,230,0.4)]"
+            >
+              <UserPlus className="mr-2 h-4 w-4" /> Sign Up
+            </Button>
+          </>
+        )}
+      </div>
+
+      <div className="w-full max-w-2xl relative">
+        <div className="absolute inset-0 bg-gradient-to-r from-[#FF2EE6] via-[#6C22BD] to-[#00FFCC] opacity-10 blur-3xl animate-gradient -z-10" />
         
-        <div className="glassmorphism relative z-10 p-8 rounded-2xl">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-2">
-              <h1 className="text-3xl font-bold neon-text">CopyWhisper</h1>
-              <Sparkles className="h-6 w-6 text-[#00FFCC]" />
-            </div>
-            {user ? null : (
-              <div className="flex gap-2">
-                <Button 
-                  onClick={handleLogin} 
-                  variant="outline" 
-                  className="bg-[#3a1465]/40 text-white hover:bg-[#4A1A82]/60"
-                >
-                  <LogIn className="mr-2 h-4 w-4" /> Login
-                </Button>
-                <Button 
-                  onClick={handleSignUp} 
-                  className="bg-[#FF2EE6] text-white hover:bg-[#FF2EE6]/80"
-                >
-                  <UserPlus className="mr-2 h-4 w-4" /> Sign Up
-                </Button>
-              </div>
-            )}
+        <div className="glassmorphism relative z-10 p-8 rounded-2xl border border-purple-500/20 shadow-xl">
+          <div className="text-center mb-6">
+            <h1 className="text-4xl font-bold neon-text mb-2">CopyWhisper</h1>
+            <p className="text-lg text-gray-300 flex items-center justify-center gap-2">
+              Generate amazing copy with AI <Sparkles className="h-5 w-5 text-[#00FFCC]" />
+            </p>
           </div>
           
-          <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-br from-[#FF2EE6]/20 to-[#00FFCC]/20 blur-xl" />
-            <CopywritingForm />
-          </div>
+          <CopywritingForm />
         </div>
       </div>
     </div>

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -6,7 +5,12 @@ import { Label } from '@/components/ui/label';
 import { useCopywritingGenerator, CopywritingInput } from '@/hooks/useCopywritingGenerator';
 import { Wand2, SendHorizontal, Sparkles } from 'lucide-react';
 
-export const CopywritingForm: React.FC = () => {
+// Define props interface including onSuccess
+interface CopywritingFormProps {
+  // REMOVED onSuccess prop definition
+}
+
+export const CopywritingForm: React.FC<CopywritingFormProps> = (/*{ onSuccess }*/) => {
   const [input, setInput] = useState<CopywritingInput>({
     niche: '',
     productName: '',
@@ -15,9 +19,13 @@ export const CopywritingForm: React.FC = () => {
 
   const { generateCopywriting, isLoading } = useCopywritingGenerator();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    generateCopywriting(input);
+    await generateCopywriting(input);
+    // Call onSuccess after successful generation - REMOVED
+    // if (typeof onSuccess === 'function') {
+    //  onSuccess();
+    // }
   };
 
   return (

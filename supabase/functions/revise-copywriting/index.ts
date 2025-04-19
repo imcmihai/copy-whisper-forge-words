@@ -1,5 +1,5 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from "https://deno.land/std/http/server.ts";
 
 const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
 
@@ -23,12 +23,7 @@ serve(async (req) => {
 Analizează cererea utilizatorului și ajustează textul original în funcție de această cerere. 
 Răspunde doar cu noua versiune a textului, fără explicații suplimentare.
 
-IMPORTANT TEXT FORMATTING REQUIREMENTS:
-1. Remove all special characters like "#", "*", "^", etc.
-2. Ensure the text is clean, professional, and easily readable
-3. Preserve the original meaning and intent of the text
-4. Use plain text with standard punctuation
-5. Do not include markdown or any special formatting
+
 
 Folosește următoarele principii în revizuirea textului:
 

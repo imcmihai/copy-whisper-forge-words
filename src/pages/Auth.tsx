@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -17,19 +16,6 @@ const Auth = () => {
   
   const isSignUp = searchParams.get('mode') === 'signup';
   
-  // Check if user is already logged in
-  useEffect(() => {
-    const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        // Redirect to generated-copy if already logged in
-        navigate('/generated-copy');
-      }
-    };
-    
-    checkUser();
-  }, [navigate]);
-
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -55,8 +41,8 @@ const Auth = () => {
           description: 'Please check your email to confirm your account.',
         });
         
-        // Redirect to the generated-copy page
-        navigate('/generated-copy');
+        // Redirect to the index page (form) after sign up
+        navigate('/');
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email,
@@ -77,8 +63,8 @@ const Auth = () => {
           description: 'Welcome back!',
         });
         
-        // Redirect to the generated-copy page instead of home
-        navigate('/generated-copy');
+        // Redirect to the index page (form) after sign in
+        navigate('/');
       }
     } catch (error) {
       console.error('Authentication error:', error);

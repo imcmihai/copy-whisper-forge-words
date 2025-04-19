@@ -106,6 +106,10 @@
 
   body {
     @apply bg-background text-foreground;
+    @apply min-h-screen bg-gradient-to-br from-[#10031F] to-[#1F063A];
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }
 
@@ -143,4 +147,14 @@
       background-position: 0% 50%;
     }
   }
+}
+
+@keyframes pulse-slow {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 0.9; }
+}
+
+@keyframes pulse-slow-delay {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 0.4; }
 }
