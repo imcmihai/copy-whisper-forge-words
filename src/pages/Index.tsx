@@ -14,6 +14,11 @@ const Index = () => {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null);
+      
+      // If user has just signed in, redirect to generated-copy
+      if (event === 'SIGNED_IN') {
+        navigate('/generated-copy');
+      }
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -23,7 +28,7 @@ const Index = () => {
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
+  }, [navigate]);
 
   const handleLogin = () => {
     navigate('/auth');

@@ -18,6 +18,22 @@ export const useCopywritingGenerator = () => {
     setIsLoading(true);
 
     try {
+      // Check if user is logged in
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        // If not logged in, redirect to auth page and store form data
+        toast({
+          title: 'Authentication Required',
+          description: 'Please log in to generate copywriting'
+        });
+        
+        // Store the input in sessionStorage to use it after auth
+        sessionStorage.setItem('pendingCopywritingInput', JSON.stringify(input));
+        navigate('/auth');
+        return;
+      }
+
       const { data: generatedData, error: openAiError } = await supabase.functions.invoke('generate-copywriting', {
         body: input
       });

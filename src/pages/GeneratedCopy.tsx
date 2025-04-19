@@ -6,11 +6,6 @@ import { toast } from '@/components/ui/use-toast';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { ChatHistorySidebar } from '@/components/chat/ChatHistorySidebar';
 import { ChatInterface } from '@/components/chat/ChatInterface';
-import { Send, Bot, User, Copy, RefreshCw, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { cn } from '@/lib/utils';
 
 interface Message {
   id: string;
@@ -40,38 +35,79 @@ const GeneratedCopy = () => {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
-    const fetchChats = async () => {
+    const checkAuthAndPendingActions = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         navigate('/auth');
         return;
       }
 
-      const { data, error } = await supabase
-        .from('chat_history')
-        .select('id, title')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+      // Check for pending copywriting input after login
+      const pendingInput = sessionStorage.getItem('pendingCopywritingInput');
+      if (pendingInput) {
+        // Clear the stored input to prevent repeated processing
+        sessionStorage.removeItem('pendingCopywritingInput');
+        
+        // Parse the input and generate copywriting
+        const input = JSON.parse(pendingInput);
+        try {
+          const { data: generatedData, error: openAiError } = await supabase.functions.invoke('generate-copywriting', {
+            body: input
+          });
 
-      if (error) {
-        console.error('Error fetching chats:', error);
-        return;
+          if (openAiError) throw openAiError;
+
+          const { data: dbData, error: dbError } = await supabase
+            .from('copywriting_texts')
+            .insert({
+              niche: input.niche,
+              product_name: input.productName,
+              product_description: input.productDescription,
+              generated_text: generatedData.generatedText
+            })
+            .select()
+            .single();
+
+          if (dbError) throw dbError;
+
+          toast({
+            title: 'Copywriting Generated',
+            description: 'Your copywriting text has been created successfully!'
+          });
+
+          // Update the messages state with the generated text
+          setMessages([{ id: '1', content: generatedData.generatedText, isUser: false }]);
+        } catch (error) {
+          console.error('Error processing pending copywriting:', error);
+          toast({
+            title: 'Error',
+            description: 'Failed to generate copywriting',
+            variant: 'destructive'
+          });
+        }
       }
 
-      setChats(data || []);
+      // Fetch chats
+      const fetchChats = async () => {
+        const { data, error } = await supabase
+          .from('chat_history')
+          .select('id, title')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching chats:', error);
+          return;
+        }
+
+        setChats(data || []);
+      };
+
+      fetchChats();
     };
 
-    fetchChats();
-  }, [navigate]);
-
-  useEffect(() => {
-    if (scrollAreaRef.current) {
-      const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
-      if (scrollContainer) {
-        scrollContainer.scrollTop = scrollContainer.scrollHeight;
-      }
-    }
-  }, [messages]);
+    checkAuthAndPendingActions();
+  }, [navigate, location.state]);
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text).then(() => {
@@ -185,7 +221,7 @@ const GeneratedCopy = () => {
     setMessages(chatMessages);
   };
 
-  if (!generatedText) {
+  if (!generatedText && messages.length === 0) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#1A052E] to-[#2D0A4E] p-4">
         <Card className="w-full max-w-2xl p-6 glassmorphism border-purple-500/20">
