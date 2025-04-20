@@ -58,7 +58,7 @@ export const ChatHistorySidebar = ({ chats, currentChat, currentUser, onChatSele
     <Sidebar className="w-64 bg-[#1F063A]/70 border-r border-purple-500/30 backdrop-blur-xl rounded-lg shadow-2xl overflow-hidden flex flex-col">
       <SidebarContent className="h-full flex flex-col">
         <div className="p-4 border-b border-purple-500/20 flex-shrink-0 flex justify-between items-center">
-          <h2 className="text-lg font-semibold text-white">Chat History</h2>
+          <h2 className="text-lg font-semibold text-purple-900">Chat History</h2>
           <Button 
             variant="ghost" 
             size="icon" 

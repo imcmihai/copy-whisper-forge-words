@@ -8,7 +8,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -37,11 +37,16 @@ Folosește următoarele principii în revizuirea textului:
 8. Include call-to-action puternice
 9. Folosește limbaj senzorial și descriptiv
 10. Personalizează mesajul pentru audiență` 
+      },
+      {
+        role: 'assistant',
+        content: originalText
       }
     ];
 
     if (previousMessages && previousMessages.length > 0) {
       for (const msg of previousMessages) {
+        if (msg.content === originalText && msg.role === 'assistant') continue;
         messages.push({
           role: msg.isUser ? 'user' : 'assistant',
           content: msg.content
@@ -79,7 +84,8 @@ Folosește următoarele principii în revizuirea textului:
     });
   } catch (error) {
     console.error('Error:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+    return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

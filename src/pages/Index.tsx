@@ -49,22 +49,22 @@ const Index = () => {
           </Button>
         ) : (
           <>
-            <Button 
+                <Button 
               onClick={() => navigate('/auth')}
-              variant="outline" 
+                  variant="outline" 
               className="bg-[#3a1465]/40 text-white hover:bg-[#4A1A82]/60 border-purple-500/30"
-            >
-              <LogIn className="mr-2 h-4 w-4" /> Login
-            </Button>
-            <Button 
+                >
+                  <LogIn className="mr-2 h-4 w-4" /> Login
+                </Button>
+                <Button 
               onClick={() => navigate('/auth?mode=signup')}
               className="bg-gradient-to-r from-[#FF2EE6] to-[#00FFCC] text-white hover:opacity-90 shadow-[0_0_10px_rgba(255,46,230,0.4)]"
-            >
-              <UserPlus className="mr-2 h-4 w-4" /> Sign Up
-            </Button>
+                >
+                  <UserPlus className="mr-2 h-4 w-4" /> Sign Up
+                </Button>
           </>
         )}
-      </div>
+              </div>
 
       <div className="w-full max-w-2xl relative">
         <div className="absolute inset-0 bg-gradient-to-r from-[#FF2EE6] via-[#6C22BD] to-[#00FFCC] opacity-10 blur-3xl animate-gradient -z-10" />
@@ -77,7 +77,7 @@ const Index = () => {
             </p>
           </div>
           
-          <CopywritingForm />
+            <CopywritingForm />
         </div>
       </div>
     </div>
