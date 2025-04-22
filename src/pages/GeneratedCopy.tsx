@@ -1,10 +1,9 @@
-/// <reference lib="dom.clipboard" />
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/components/ui/use-toast';
-import { SidebarProvider } from '@/components/ui/sidebar';
+import { supabase } from '../integrations/supabase/client';
+import { toast } from '../components/ui/use-toast';
+import { SidebarProvider } from '../components/ui/sidebar';
 import { ChatHistorySidebar } from '@/components/chat/ChatHistorySidebar';
 import { ChatInterface } from '@/components/chat/ChatInterface';
 import { User } from '@supabase/supabase-js';

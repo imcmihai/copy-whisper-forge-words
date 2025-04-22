@@ -14,36 +14,55 @@ serve(async (req: Request) => {
   }
 
   try {
-    const { niche, productName, productDescription } = await req.json();
+    const { 
+      niche, 
+      productName, 
+      productDescription, 
+      tone, 
+      targetPublic, 
+      textFormat, 
+      textLength, 
+      keywords, 
+      textObjective 
+    } = await req.json();
 
-    const prompt = `Acționezi ca un copywriter profesionist cu ani de experiență. Creează un text de copywriting convingător pentru următorul produs:
+    const prompt = `Act as a professional copywriter with years of experience. Create compelling copywriting text for the following product, strictly adhering to the details provided:
 
-Nișă: ${niche}
-Nume Produs: ${productName}
-Descriere Produs: ${productDescription}
+Niche: ${niche || 'Unspecified'}
+Product Name: ${productName || 'Unspecified'}
+Product Description: ${productDescription || 'Unspecified'}
 
-Textul trebuie să fie scris in limba in care este scrisa Descrierea Produsului și să fie structurat într-un format ușor de citit.
+CRITICAL INSTRUCTION: Analyze the language used in the Niche, Product Name, and Product Description fields above. Generate the final output text EXCLUSIVELY in that same language. For example, if the inputs are in French, the output must be in French. If they are in English, the output must be English. Do NOT use any other language for the final generated text.
 
-CERINȚE IMPORTANTE PENTRU FORMATUL TEXTULUI:
-Nu folosi în text caractere precum „#”, „*”, „^” etc.
-Asigură-te că textul este clar, profesional și ușor de citit
-Păstrează sensul și intenția originală a textului
-Folosește text simplu cu punctuație standard
-Nu include markdown sau alte formate speciale
+Additional Details:
+Tone: ${tone || 'Unspecified'}
+Target Audience: ${targetPublic || 'General'}
+Text Format: ${textFormat || 'Unspecified'}
+Text Length: ${textLength || 'Unspecified'}
+Keywords to Include: ${keywords || 'None'}
+Text Objective: ${textObjective || 'Unspecified'}
 
-Folosește următoarele principii în crearea textului:
-0.Textul trebuie sa fiecat mai conversational si personal
-1. Prioritizează impactul și claritatea mesajului
-2. Structurează conținutul pentru lizibilitate maximă
-3. Folosește creativitate și storytelling
-4. Adoptă un ton conversațional și prietenos
-5. Educă și împuternicește cititorul
-6. Echilibrează informațiile practice cu elemente captivante
-7. Aprofundează conexiunea emoțională
-8. Include call-to-action puternice
-9. Folosește limbaj senzorial și descriptiv
-10. Personalizează mesajul pentru audiență
+CRITICAL INSTRUCTION: You have to respect the Text Format and Text Length. ##Pay attention to the text objective. Make sure you are generating the text according to the text objective.##
 
+IMPORTANT REQUIREMENTS FOR TEXT FORMAT:
+- Do not use special characters like "#", "*", "^", etc., in the text.
+- Ensure the text is clear, professional, and easy to read.
+- Preserve the original meaning and intent.
+- Use plain text with standard punctuation.
+- Do not include markdown or other special formatting.
+
+Use the following principles when creating the text:
+0. The text should be conversational and personal.
+1. Prioritize message impact and clarity.
+2. Structure content for maximum readability.
+3. Use creativity and storytelling.
+4. Adopt a conversational and friendly tone (as indicated by Tone).
+5. Educate and empower the reader (considering Target Audience).
+6. Balance practical information with captivating elements.
+7. Deepen the emotional connection.
+8. Include strong calls-to-action (aligned with Text Objective).
+9. Use sensory and descriptive language.
+10. Personalize the message for the audience (considering Target Audience).
 `;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {

@@ -1,20 +1,40 @@
 {
-  "files": ["DOM", "DOM.Iterable"],
+  // Keep references if that's how your project is structured
   "references": [
-    { "path": "./tsconfig.app.json" },
-    { "path": "./tsconfig.node.json" }
+    { "path": "./tsconfig.node.json" },
   ],
   "compilerOptions": {
-    "baseUrl": ".",
+    // --- Essential Fixes & Additions ---
+    "lib": ["ESNext", "DOM", "DOM.Iterable"], // <-- Moved DOM libs here, added ESNext
+    "jsx": "react-jsx", // <-- Added for React JSX
+    "baseUrl": ".", // Base for paths
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"] // Your alias (looks correct)
     },
-    "noImplicitAny": false,
-    "noUnusedParameters": false,
+
+    // --- Recommended for Vite/React/Modern JS ---
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler", // Or "Node"
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true, // Often used with allowSyntheticDefaultImports
+
+    // --- Existing Options (Consider enabling stricter checks later) ---
     "skipLibCheck": true,
     "allowJs": true,
+    "noImplicitAny": false,
+    "noUnusedParameters": false,
     "noUnusedLocals": false,
-    "strictNullChecks": false
-  }
-  
+    "strictNullChecks": false,
+
+    // --- Consider adding if not inherited ---
+    // "strict": true, // Enables all strict type-checking options (recommended)
+    "forceConsistentCasingInFileNames": true // Good practice
+  },
+  // Ensure your source code is included for checking
+  "include": ["src", /* other relevant paths like tests, vite.config.ts etc */],
+  // Exclude build outputs, node_modules etc.
+  "exclude": ["node_modules", "dist"]
 }

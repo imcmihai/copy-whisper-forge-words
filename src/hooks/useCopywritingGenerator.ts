@@ -1,14 +1,21 @@
 // Import necessary hooks and utilities
 import { useState } from 'react'; // React hook for managing component state
 import { useNavigate } from 'react-router-dom'; // Hook for programmatic navigation
-import { supabase } from '@/integrations/supabase/client'; // Supabase client instance
-import { toast } from '@/components/ui/use-toast'; // Function to display toast notifications
+import { supabase } from '../integrations/supabase/client'; // Supabase client instance
+import { toast } from '../components/ui/use-toast'; // Function to display toast notifications
 
 // Define the structure for the copywriting form input
 export interface CopywritingInput {
   niche: string; // The niche of the product
   productName: string; // The name of the product
   productDescription: string; // The description of the product
+  // --- New Fields --- 
+  tone: string; // Desired tone of the text
+  targetPublic: string; // Target audience description
+  textFormat: string; // Desired output format (email, ad, etc.)
+  textLength: string; // Desired length indicator (short, medium, long, specific count)
+  keywords: string; // Keywords to include
+  textObjective: string; // Main goal of the text (sales, info, engagement)
 }
 
 // Helper function to save generated text and profile data for logged-in users
@@ -20,7 +27,7 @@ const saveDataForUser = async (userId: string, input: CopywritingInput, generate
     const { error: dbError } = await supabase
       .from('copywriting_texts') // Target the 'copywriting_texts' table
       .insert({ // Provide the data to insert
-        user_id: userId, // Associate with the current user ID
+        user_id: userId, // RE-ADDED - Link text to the user
         niche: input.niche, // Save the niche from input
         product_name: input.productName, // Save the product name from input
         product_description: input.productDescription, // Save the product description from input
