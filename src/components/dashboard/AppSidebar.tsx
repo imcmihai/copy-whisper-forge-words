@@ -26,11 +26,11 @@ export function AppSidebar({ user }: AppSidebarProps) {
   };
 
   const handleCreateCopyClick = () => {
-    navigate('/');  // Redirects to the Index page, which contains the CopywritingForm
+    navigate('/');
   };
 
   const handleChatClick = () => {
-    navigate('/generated-copy');  // Redirects to the Copy Chats page
+    navigate('/generated-copy');
   };
 
   const handleDashboardClick = () => {
