@@ -1,10 +1,9 @@
-
 import { User } from '@supabase/supabase-js';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, MessageSquare, TrendingUp, Clock, Star } from 'lucide-react';
-import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables } from '@/integrations/supabase/types';
 
@@ -12,54 +11,66 @@ interface DashboardContentProps {
   user: User | null;
 }
 
+// --- React Query Fetching Functions ---
+
+// Fetch counts for stats
+const fetchDashboardStats = async (userId: string) => {
+  const { count: totalCopies, error: copiesError } = await supabase
+    .from('copywriting_texts')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', userId);
+
+  if (copiesError) throw copiesError;
+
+  const { count: totalChats, error: chatsError } = await supabase
+    .from('chat_history')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', userId);
+
+  if (chatsError) throw chatsError;
+
+  return { totalCopies: totalCopies || 0, totalChats: totalChats || 0 };
+};
+
+// Fetch recent copies
+const fetchRecentCopies = async (userId: string) => {
+  const { data: copies, error } = await supabase
+    .from('copywriting_texts')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(3);
+
+  if (error) throw error;
+  return copies || [];
+};
+
 export function DashboardContent({ user }: DashboardContentProps) {
   const navigate = useNavigate();
-  const [recentCopies, setRecentCopies] = useState<Tables<'copywriting_texts'>[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [stats, setStats] = useState({
-    totalCopies: 0,
-    totalChats: 0
+  const userId = user?.id;
+
+  // --- React Query Hooks ---
+
+  // Query for dashboard stats
+  const { data: stats, isLoading: isLoadingStats } = useQuery({
+    queryKey: ['dashboardStats', userId],
+    queryFn: () => fetchDashboardStats(userId!),
+    enabled: !!userId,
+    staleTime: 5 * 60 * 1000,
   });
 
-  useEffect(() => {
-    const fetchData = async () => {
-      if (user) {
-        // Fetch recent copywriting texts
-        const { data: copies, error: copiesError } = await supabase
-          .from('copywriting_texts')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(3);
+  // Query for recent copies
+  const { data: recentCopies, isLoading: isLoadingCopies } = useQuery({
+    queryKey: ['recentCopies', userId],
+    queryFn: () => fetchRecentCopies(userId!),
+    enabled: !!userId,
+    staleTime: 2 * 60 * 1000,
+  });
+  
+  // Combined loading state (or handle individually)
+  const isLoading = isLoadingStats || isLoadingCopies;
 
-        if (!copiesError && copies) {
-          setRecentCopies(copies);
-        }
-
-        // Get total copies count
-        const { count: totalCopies } = await supabase
-          .from('copywriting_texts')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', user.id);
-
-        // Get total chats count
-        const { count: totalChats } = await supabase
-          .from('chat_history')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', user.id);
-
-        setStats({
-          totalCopies: totalCopies || 0,
-          totalChats: totalChats || 0
-        });
-      }
-      
-      setIsLoading(false);
-    };
-
-    fetchData();
-  }, [user]);
-
+  // --- Event Handlers ---
   const handleCreateNewCopy = () => {
     navigate('/');
   };
@@ -68,6 +79,7 @@ export function DashboardContent({ user }: DashboardContentProps) {
     navigate('/generated-copy');
   };
 
+  // --- Render Logic ---
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-8">
@@ -91,16 +103,20 @@ export function DashboardContent({ user }: DashboardContentProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="text-center p-3 bg-white/5 rounded-lg">
-                <p className="text-sm text-purple-300">Total Copies</p>
-                <p className="text-2xl font-semibold neon-text">{stats.totalCopies}</p>
+            {isLoadingStats ? (
+               <p className="text-purple-300 animate-pulse">Loading stats...</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="text-center p-3 bg-white/5 rounded-lg">
+                  <p className="text-sm text-purple-300">Total Copies</p>
+                  <p className="text-2xl font-semibold neon-text">{stats?.totalCopies ?? 0}</p>
+                </div>
+                <div className="text-center p-3 bg-white/5 rounded-lg">
+                  <p className="text-sm text-purple-300">Total Chats</p>
+                  <p className="text-2xl font-semibold neon-text">{stats?.totalChats ?? 0}</p>
+                </div>
               </div>
-              <div className="text-center p-3 bg-white/5 rounded-lg">
-                <p className="text-sm text-purple-300">Total Chats</p>
-                <p className="text-2xl font-semibold neon-text">{stats.totalChats}</p>
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
 
@@ -163,11 +179,11 @@ export function DashboardContent({ user }: DashboardContentProps) {
           Recent Copies
         </h2>
         
-        {isLoading ? (
+        {isLoadingCopies ? (
           <div className="text-center py-8">
             <p className="text-purple-300 animate-pulse">Loading recent copies...</p>
           </div>
-        ) : recentCopies.length > 0 ? (
+        ) : recentCopies && recentCopies.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {recentCopies.map((copy) => (
               <Card key={copy.id} className="bg-white/5 backdrop-blur-lg border-purple-500/20 text-white hover:bg-white/10 transition-all">

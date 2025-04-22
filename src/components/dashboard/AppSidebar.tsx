@@ -1,7 +1,6 @@
-
 import { User } from '@supabase/supabase-js';
 import { useNavigate } from 'react-router-dom';
-import { UserCircle, PlusCircle, MessageSquare, LayoutDashboard } from 'lucide-react';
+import { UserCircle, PlusCircle, MessageSquare, LayoutDashboard, User as UserIconLucide } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
@@ -50,10 +49,10 @@ export function AppSidebar({ user }: AppSidebarProps) {
             </Avatar>
           </div>
           <div className="flex flex-col justify-center">
-            <h3 className="text-sm font-medium text-white overflow-hidden text-ellipsis">
+            <h3 className="text-xl font-medium text-purple-900 overflow-hidden text-ellipsis">
               {user?.email?.split('@')[0] || 'User'}
             </h3>
-            <p className="text-xs text-purple-300/80 overflow-hidden text-ellipsis">
+            <p className="text-xs text-purple-600/80 overflow-hidden text-ellipsis">
               {user?.email || 'Anonymous'}
             </p>
           </div>
@@ -66,7 +65,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
             className="w-full bg-gradient-to-r from-[#FF2EE6] to-[#00FFCC] text-white font-semibold py-2 rounded-md transition-all duration-200 hover:opacity-90"
             onClick={handleCreateCopyClick}
           >
-            <PlusCircle className="mr-2 h-5 w-5" />
+            <PlusCircle className="mr-2 h-6 w-6" />
             Create New Copy
           </Button>
         </div>
@@ -78,7 +77,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
               onClick={handleDashboardClick}
               tooltip="Dashboard"
             >
-              <LayoutDashboard className="h-5 w-5" />
+              <LayoutDashboard className="h-6 w-6" />
               <span>Dashboard</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -89,7 +88,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
               onClick={handleChatClick}
               tooltip="Copy Chats"
             >
-              <MessageSquare className="h-5 w-5" />
+              <MessageSquare className="h-6 w-6" />
               <span>Copy Chats</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -100,7 +99,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
               onClick={handleProfileClick}
               tooltip="Profile"
             >
-              <UserCircle className="h-5 w-5" />
+              <UserIconLucide className="h-6 w-6" />
               <span>My Profile</span>
             </SidebarMenuButton>
           </SidebarMenuItem>

@@ -67,7 +67,7 @@ export const ChatHistorySidebar = ({ chats, currentChat, currentUser, onChatSele
             className="text-purple-300 hover:text-white hover:bg-purple-500/10 disabled:opacity-50"
             title="Start New Chat"
           >
-            <Plus className="h-5 w-5" />
+            <Plus className="h-6 w-6" />
           </Button>
         </div>
         <SidebarGroup className="p-2 flex-grow overflow-y-auto scrollbar-thin scrollbar-thumb-purple-500/30 scrollbar-track-transparent">
@@ -93,7 +93,7 @@ export const ChatHistorySidebar = ({ chats, currentChat, currentUser, onChatSele
                     )}
                     <div className="flex items-center overflow-hidden pl-1">
                       <MessageSquare 
-                         className={`mr-2.5 h-5 w-5 flex-shrink-0 transition-colors duration-150 ease-in-out 
+                         className={`mr-2.5 h-6 w-6 flex-shrink-0 transition-colors duration-150 ease-in-out 
                          ${chat.id === currentChat ? 'text-white' : 'text-purple-300 group-hover:text-[#FF2EE6]'}`}
                       />
                       <span className={`truncate ${chat.id === currentChat ? 'font-semibold' : 'font-medium'}`}>
@@ -108,7 +108,7 @@ export const ChatHistorySidebar = ({ chats, currentChat, currentUser, onChatSele
                     className="absolute right-1.5 top-1/2 -translate-y-1/2 h-7 w-7 text-gray-400 hover:text-red-500 hover:bg-red-500/15 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-out rounded-md z-10"
                     title="Delete Chat"
                   >
-                    <X className="h-4 w-4" />
+                    <X className="h-5 w-5" />
                   </Button>
                 </SidebarMenuItem>
               ))

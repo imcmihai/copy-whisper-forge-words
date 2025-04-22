@@ -1,4 +1,3 @@
-
 import { CopywritingForm } from '@/components/CopywritingForm';
 import { Sparkles, LogIn, UserPlus, User as UserIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -37,11 +36,6 @@ const Index = () => {
       subscription.unsubscribe();
     };
   }, []);
-
-  // Redirect to dashboard if user is logged in
-  if (!isLoading && currentUser) {
-    return <Navigate to="/dashboard" />;
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#1A052E] to-[#2D0A4E] p-4 flex flex-col items-center justify-center relative">

@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
 import { supabase } from '../integrations/supabase/client';
 import { toast } from '../components/ui/use-toast';
-import { SidebarProvider } from '../components/ui/sidebar';
+import { SidebarProvider, useSidebar } from '../components/ui/sidebar';
 import { ChatHistorySidebar } from '@/components/chat/ChatHistorySidebar';
 import { ChatInterface } from '@/components/chat/ChatInterface';
 import { User } from '@supabase/supabase-js';
 import { CopywritingInput } from '@/hooks/useCopywritingGenerator';
+import { Button } from '@/components/ui/button';
+import { PanelLeft } from 'lucide-react';
 
 interface Message {
   id: string;
@@ -201,449 +204,312 @@ const saveMessagesForUser = async (
    }
 };
 
-// --- Main Component --- 
-
-const GeneratedCopy = () => {
-  // --- State Variables --- 
-  // Get location object for accessing navigation state
+// --- Inner Layout Component (Now contains the core logic) --- 
+const GeneratedCopyLayout = () => {
   const location = useLocation();
-  // Get navigation function
   const navigate = useNavigate();
-  
-  // Extract initial data passed via navigation state, providing defaults
-  const { generatedText, initialInput } = (location.state || { generatedText: null, initialInput: null }) as { generatedText: string | null, initialInput: CopywritingInput | null };
+  const queryClient = useQueryClient();
+  const { isMobile, setOpenMobile, toggleSidebar } = useSidebar();
 
-  // State for the chat messages array
+  // --- State Variables --- 
   const [messages, setMessages] = useState<Message[]>(() => {
-    // Initialize messages with generatedText if available
-    if (generatedText) {
-      // Return initial message array
-      return [{ id: 'initial-0', content: generatedText, isUser: false }];
-    }
-    // Otherwise, return an empty array
-    return [];
+     const passedState = location.state as { generatedText?: string | null } | null;
+     const generatedText = passedState?.generatedText;
+     return generatedText ? [{ id: 'initial-0', content: generatedText, isUser: false }] : [];
   });
-  // State for the chat input field value
   const [inputValue, setInputValue] = useState('');
-  // State for tracking loading status (e.g., during AI response)
   const [isLoading, setIsLoading] = useState(false);
-  // State for the list of chat history items for the sidebar
   const [chats, setChats] = useState<ChatHistory[]>([]);
-  // State for the ID of the currently active chat session
   const [currentChat, setCurrentChat] = useState<string | null>(null);
-  // State for the currently authenticated user object (or null)
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  // Ref for scrolling the chat area (implementation not shown)
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   
   // --- Effects --- 
-
-  // Effect to initialize chat state, auth, and history on load or when input changes
   useEffect(() => {
-    // Flag to prevent state updates after component unmounts
     let isMounted = true; 
-    // Flag to ensure new chat creation logic runs only once per initialInput
-    let processedInput = false; 
-
-    // Define the async function to perform initialization
     const initializeChat = async () => {
-      // --- 1. Check Auth & Set User --- 
       try {
-        // Check authentication status
         const user = await checkAuthStatus();
-        // If component is still mounted, update the user state
         if (isMounted) setCurrentUser(user);
 
-        // --- 2. Handle Initial State & Redirect --- 
-        // Redirect if required initial text is missing
-        if (!generatedText) {
-          // Check if navigation state was explicitly missing (not just initial render)
-          if (location.state === null) { 
-             console.warn('Generated text missing, navigating to index.');
-             navigate('/');
+        const passedState = location.state as { generatedText?: string | null; initialInput?: CopywritingInput | null } | null;
+        const generatedText = passedState?.generatedText;
+        const initialInput = passedState?.initialInput;
+        let newChatId: string | null = null;
+        let tempChatIdUsed: string | null = null;
+        let shouldFetchHistory = true;
+
+        if (initialInput && user && generatedText) {
+          console.log("Initial input detected, creating new chat session.");
+          const { tempChatId, newChatIdFromDb } = await createNewChatOptimistically(user, initialInput, setCurrentChat, setChats);
+          newChatId = newChatIdFromDb;
+          tempChatIdUsed = tempChatId;
+          shouldFetchHistory = false;
+
+          if (isMounted && messages.length === 0) {
+            setMessages([{ id: 'initial-0', content: generatedText, isUser: false }]);
           }
-          return; // Stop initialization if redirecting or missing text
+          if (newChatIdFromDb) {
+             try { 
+                 const { error } = await supabase.from('chat_messages').insert({ chat_id: newChatIdFromDb, content: generatedText, role: 'assistant' as const });
+                 if (error) throw error;
+             } catch (e) { console.error("Failed to save initial message", e); /* Toast? */ }
+          }
+          navigate(location.pathname, { replace: true, state: { generatedText: generatedText, initialInput: null } });
+          
+        } else if (initialInput && (!user || !generatedText)) {
+            console.error("Form navigation error: Missing user or generatedText.");
+            toast({ title: "Error", description: "Could not initialize new chat.", variant: "destructive" });
+            navigate('/');
+            return;
+        } else {
+          console.log("No initial input detected (direct navigation or refresh).");
+          if (!user && isMounted) { 
+             console.log("User not logged in for direct navigation."); 
+             shouldFetchHistory = false;
+          }
         }
         
-        // Set initial message if messages array is empty
-        if (isMounted && messages.length === 0 && generatedText) {
-          setMessages([{ id: 'initial-0', content: generatedText, isUser: false }]);
-        }
-
-        // --- 3. Handle Logged-in User Logic --- 
-        if (user && isMounted) {
-          // Define variable to hold the ID of a newly created chat
-          let newChatId: string | null = null;
-          // Define variable to hold the temp ID during optimistic update
-          let tempChatIdUsed: string | null = null;
-
-          // --- 3a. New Chat Creation (if initialInput exists and not yet processed) --- 
-          if (initialInput && !processedInput) {
-            // Mark initialInput as processed for this effect run
-            processedInput = true;
-            // Clear the initialInput from location state to prevent re-processing on re-renders
-            navigate(location.pathname, { replace: true, state: { generatedText: generatedText, initialInput: null } }); 
-
-            // Perform optimistic update and database insert for the new chat
-            const { tempChatId, newChatIdFromDb } = await createNewChatOptimistically(user, initialInput, setCurrentChat, setChats);
-            // Store the real ID if creation was successful
-            newChatId = newChatIdFromDb;
-            // Store the temp ID used
-            tempChatIdUsed = tempChatId;
-
-             // --- Save the initial generated message --- 
-             // Check if chat creation was successful (got a real ID) and text exists
-             if (newChatIdFromDb && generatedText) {
-                 // Try saving the first message from the AI
-                 try {
-                   const { error: initialMsgError } = await supabase
-                     .from('chat_messages') // Target table
-                     .insert({ // Data to insert
-                       chat_id: newChatIdFromDb, // Use the real chat ID
-                       content: generatedText, // The initial AI-generated text
-                       role: 'assistant' as const // Role is assistant
-                     });
-  
-                   // If saving the initial message failed, throw error
-                   if (initialMsgError) throw initialMsgError;
-                 // Handle errors saving the initial message
-                 } catch (initialMsgSaveError) {
-                     // Log the error
-                     console.error("Error saving initial message:", initialMsgSaveError);
-                     // Show a toast notification
-          toast({
-                        title: "Save Error",
-                        description: "Could not save the initial message for the new chat.",
-                        variant: "destructive",
-                     });
-                      // Note: Chat history entry exists, but initial message save failed.
-                 }
-             } // --- End Save Initial Message --- 
-          }
-
-          // --- 3b. Fetch Chat History --- 
-          // Fetch the rest of the chat history (excluding the one just created, if applicable)
-          const history = await fetchChatHistory(user, newChatId, setChats);
-          // If component is still mounted, update the chats state
+        if (shouldFetchHistory && user && isMounted) {
+          console.log("Fetching existing chat history.");
+          const history = await fetchChatHistory(user, null, setChats);
+          let combinedHistory: ChatHistory[] = [];
           if (isMounted) {
-            // Combine the current chats state (which might include the optimistically added/updated new chat)
-            // with the fetched history, ensuring the current one remains and deduplicating.
-            setChats(prevChats => {
-               // Find the entry for the current chat (could be temp or real ID)
-               const currentChatEntry = prevChats.find(c => c.id === (newChatId || tempChatIdUsed));
-               // Combine: put current entry first, then fetched history
-               const combined = [
-                 ...(currentChatEntry ? [currentChatEntry] : []), 
-                 ...history
-               ];
-               // Deduplicate using a Map based on ID
-               return Array.from(new Map(combined.map(chat => [chat.id, chat])).values());
-            });
+             setChats(prevChats => {
+                const currentChatEntry = prevChats.find(c => c.id === (newChatId || tempChatIdUsed));
+                const safeHistory = Array.isArray(history) ? history : []; 
+                combinedHistory = [
+                   ...(currentChatEntry ? [currentChatEntry] : []), 
+                   ...safeHistory
+                ];
+                return Array.from(new Map(combinedHistory.map(chat => [chat.id, chat])).values());
+             });
+
+             if (!initialInput && !currentChat && combinedHistory.length > 0) {
+                const latestChatId = combinedHistory[0].id;
+                console.log(`Direct navigation: Auto-selecting latest chat ${latestChatId}`);
+                setTimeout(() => { if (isMounted) { handleChatSelect(latestChatId); } }, 0);
+             }
           }
         }
-      // Catch any errors during the entire initialization process
-      } catch (initError) {
-        // Log the initialization error
-        console.error("Error during chat initialization:", initError);
-        // No user-facing toast here as specific errors are handled in helpers
-      }
+      } catch (initError) { console.error("Error during chat initialization:", initError); }
     };
-
-    // Execute the initialization function
     initializeChat();
+    return () => { isMounted = false; };
+  }, [navigate, location.state]);
 
-    // Cleanup function to run when the component unmounts or dependencies change
-    return () => {
-      // Set the mounted flag to false to prevent state updates on unmounted component
-      isMounted = false; 
-    };
-  // Dependencies array for the useEffect hook
-  // Re-run effect if navigate, generatedText, or initialInput change
-  }, [navigate, generatedText, initialInput, location.state]); // Added location.state as dep
-
-  // --- Event Handlers --- 
-
-  // Handler for copying text to clipboard (implementation not shown, assume correct)
-  const copyToClipboard = useCallback((text: string) => {
-    // Implementation details...
-    navigator.clipboard.writeText(text).then(() => {
-       toast({ title: "Copied", description: "Text copied to clipboard." });
-    }).catch((err: any) => {
-       console.error("Copy error:", err);
-       toast({ title: "Copy Failed", variant: "destructive" });
-    });
-  }, []);
-
-  // Handler for sending a new message or revising the text
-  const handleSendMessage = useCallback(async (e: React.FormEvent) => {
-    // Prevent default form submission behavior
-    e.preventDefault();
-    
-    // Trim whitespace from input value
-    const trimmedInput = inputValue.trim();
-    // Exit if input is empty or already loading
-    if (!trimmedInput || isLoading) return;
-    
-    // Store the user's message content
-    const userMessage = trimmedInput;
-    // Create the new message object for the user
-    const newUserMessage: Message = { id: Date.now().toString(), content: userMessage, isUser: true };
-    
-    // Optimistically update the messages state with the user's message
-    setMessages(prev => [...prev, newUserMessage]);
-    // Clear the input field
-    setInputValue('');
-    // Set loading state to true (for AI response)
-    setIsLoading(true);
-    
-    // Variable to store the AI's revised text response
-    let revisedText = '';
-
-    // Start try block for AI call and message saving
-    try {
-      // Find the first non-user (assistant) message to use as original text for revision
-      const originalTextForRevision = messages.find(msg => !msg.isUser)?.content || generatedText || ''; 
-      
-      // Invoke the 'revise-copywriting' Supabase Edge Function
-      const { data, error } = await supabase.functions.invoke('revise-copywriting', {
-        body: { // Request body
-          originalText: originalTextForRevision, // Text to be revised
-          userInstructions: userMessage, // User's instructions for revision
-          previousMessages: messages // Pass the current message history (excluding the new user message)
-        }
-      });
-      
-      // If the function invocation resulted in an error, throw it
-      if (error) throw error;
-      // Store the revised text from the response
-      revisedText = data.revisedText;
-      
-      // Create the new message object for the assistant's response
-      const assistantMessage: Message = { 
-        id: (Date.now() + 1).toString(), // Generate a unique ID
-        content: revisedText, // AI's response content
-        isUser: false // Mark as not from the user
-      }; 
-      // Update the messages state with the assistant's response
-      setMessages(prev => [...prev, assistantMessage]);
-
-      // If the user is logged in and a chat session is active, save the messages
-      if (currentUser && currentChat) {
-        // Call helper function to save user and assistant messages
-        await saveMessagesForUser(currentChat, userMessage, revisedText);
-      }
-
-    // Catch errors from AI function invocation or message saving
-    } catch (error) {
-      // Log the error
-      console.error('Error revising or saving message:', error);
-      // Show a generic error toast ONLY if it wasn't a save error (which shows its own toast)
-      if (!(error instanceof Error && error.message.includes('Failed to save message history'))) { 
-         toast({
-           title: 'Revision Error',
-           description: 'Failed to get revised text from AI.',
-           variant: 'destructive'
-         });
-      }
-      // Revert optimistic UI update: remove the user's message that failed
-      setMessages(prev => prev.filter(msg => msg.id !== newUserMessage.id));
-    // Finally block ensures loading state is reset
-    } finally {
-      // Set loading state back to false
-      setIsLoading(false);
-    }
-  // Dependencies for the useCallback hook
-  }, [inputValue, isLoading, messages, currentUser, currentChat, navigate, generatedText]);
-
-  // Handler for selecting a chat from the history sidebar
+  // --- Event Handlers & Mutations --- 
   const handleChatSelect = useCallback(async (chatId: string) => {
-    // Log the selection
-    console.log(`handleChatSelect called with chatId: ${chatId}`);
-    // Do nothing if user isn't logged in or the selected chat is already active
-    if (!currentUser || chatId === currentChat) {
-      console.log(`Skipping fetch: currentUser=${!!currentUser}, chatId === currentChat=${chatId === currentChat}`);
-          return;
-        }
+    if (!currentUser || chatId === currentChat) { return; }
+    
+    let closedMobile = false;
+    if (isMobile) {
+      setOpenMobile(false);
+      closedMobile = true;
+    }
+    
+    if (closedMobile) {
+       await new Promise(resolve => setTimeout(resolve, 300));
+    }
 
-    // Set the selected chat ID as the current chat
     setCurrentChat(chatId);
-    // Set loading state to true
     setIsLoading(true); 
-    // Clear the current messages immediately
     setMessages([]); 
-
-    // Start try block for fetching messages
     try {
-      // Log the fetch attempt
-      console.log(`Fetching messages for chat ID: ${chatId}`);
-      // Fetch messages from 'chat_messages' table for the selected chat ID
-      const { data, error } = await supabase
-        .from('chat_messages') // Target table
-        .select('content, role') // Select required columns
-        .eq('chat_id', chatId) // Filter by chat ID
-        .order('created_at'); // Order by creation time
-
-      // If fetching failed, throw the error
-      if (error) {
-         console.error('Supabase message fetch error object:', error);
-         throw error;
-      }
-
-      // Log the raw data received
-      console.log('Raw data from Supabase:', data);
-
-      // Map the fetched data to the Message interface structure
-      const chatMessages: Message[] = data.map((
-          msg: { content: string | null, role: string | null }, // Added type for msg
-          index: number // Added type for index
-         ) => ({
-        id: `${chatId}-${index}`, 
-        content: msg.content || "", 
-        isUser: msg.role === 'user' 
-      }));
-      
-      // Log the mapped messages array
-      console.log('Mapped chatMessages before setMessages:', chatMessages);
-
-      // Update the messages state with the fetched messages
-      setMessages(chatMessages);
-      // Log successful state update
-      console.log('setMessages called successfully');
-
-    // Catch errors during message fetching
+       console.log(`Fetching messages for chat ID: ${chatId}`);
+       const { data, error } = await supabase.from('chat_messages').select('content, role').eq('chat_id', chatId).order('created_at');
+       if (error) throw error;
+       const chatMessages: Message[] = data.map((msg: any, index: number) => ({ id: `${chatId}-${index}`, content: msg.content || "", isUser: msg.role === 'user' }));
+       setMessages(chatMessages);
     } catch (error) {
-      // Log the fetch error
-      console.error('Error fetching chat messages:', error);
-      // Show an error toast
-      toast({
-        title: 'Error',
-        description: 'Failed to load selected chat.',
-        variant: 'destructive'
-      });
-      // Keep messages empty on error (already cleared)
-    // Finally block ensures loading state is reset
-    } finally {
-      // Set loading state back to false
-      setIsLoading(false);
-    }
-  // Dependencies for the useCallback hook
-  }, [currentUser, currentChat]);
+       console.error('Error fetching chat messages:', error);
+       toast({ title: 'Error', description: 'Failed to load selected chat.', variant: 'destructive' });
+    } finally { setIsLoading(false); }
+  }, [currentUser, currentChat, isMobile, setOpenMobile]);
 
-  // Handler for the 'New Chat' button click
-  const handleNewChat = useCallback(() => {
-    // Navigate user back to the index page (form page)
-    navigate('/');
-  // Dependencies for the useCallback hook
-  }, [navigate]);
+  const handleSendMessage = useCallback(async (e: React.FormEvent) => {
+     e.preventDefault();
+     const trimmedInput = inputValue.trim();
+     if (!trimmedInput || isLoading) return;
+     const userMessage = trimmedInput;
+     const newUserMessage: Message = { id: Date.now().toString(), content: userMessage, isUser: true };
+     setMessages(prev => [...prev, newUserMessage]);
+     setInputValue('');
+     setIsLoading(true);
+     let revisedText = '';
+     try {
+       const originalText = messages.find(msg => !msg.isUser)?.content || '';
+       const { data, error } = await supabase.functions.invoke('revise-copywriting', { body: { originalText, userInstructions: userMessage, previousMessages: messages } });
+       if (error) throw error;
+       revisedText = data.revisedText;
+       const assistantMessage: Message = { id: (Date.now() + 1).toString(), content: revisedText, isUser: false }; 
+       setMessages(prev => [...prev, assistantMessage]);
+       if (currentUser && currentChat) { await saveMessagesForUser(currentChat, userMessage, revisedText); }
+     } catch (error) { console.error('Error revising:', error); setMessages(prev => prev.filter(msg => msg.id !== newUserMessage.id));
+     } finally { setIsLoading(false); }
+  }, [inputValue, isLoading, messages, currentUser, currentChat, navigate]);
 
-  // Handler for deleting a chat
-  const handleDeleteChat = useCallback(async (chatId: string) => {
-    // Ensure user is logged in
-    if (!currentUser) return; 
+  const handleNewChat = useCallback(() => { navigate('/'); }, [navigate]);
 
-    // Log the deletion attempt
-    console.log(`Attempting to delete chat ID: ${chatId}`);
-    // Start try block for deletion operations
-    try {
-      // --- 1. Delete associated messages --- 
-      // Delete all messages where chat_id matches
-      const { error: msgError } = await supabase
-        .from('chat_messages') // Target table
-        .delete() // Delete operation
-        .eq('chat_id', chatId); // Filter by chat ID
-      // If message deletion fails, throw the error
+  const deleteChatMutation = useMutation({ 
+    mutationFn: async (chatId: string) => {
+      if (!currentUser) throw new Error("User not auth");
+      const { error: msgError } = await supabase.from('chat_messages').delete().eq('chat_id', chatId);
       if (msgError) throw msgError;
-      // Log successful message deletion
-      console.log(`Deleted messages for chat ID: ${chatId}`);
-
-      // --- 2. Delete chat history entry --- 
-      // Delete the entry from chat_history table
-      const { error: chatError } = await supabase
-        .from('chat_history') // Target table
-        .delete() // Delete operation
-        .eq('id', chatId) // Filter by chat ID
-        .eq('user_id', currentUser.id); // Ensure the logged-in user owns this chat
-      // If chat history deletion fails, throw the error
+      const { error: chatError } = await supabase.from('chat_history').delete().eq('id', chatId).eq('user_id', currentUser.id);
       if (chatError) throw chatError;
-       // Log successful chat history deletion
-      console.log(`Deleted chat history entry for ID: ${chatId}`);
-
-      // --- 3. Update local state --- 
-      // Remove the deleted chat from the local 'chats' state
-      setChats(prev => prev.filter(chat => chat.id !== chatId));
-      // Show a success toast
-      toast({ title: "Chat Deleted", description: "The chat has been permanently deleted." });
-
-      // --- 4. Reset view if current chat was deleted --- 
-      // Check if the deleted chat was the one currently being viewed
-      if (currentChat === chatId) {
-        // Reset the current chat ID state
-        setCurrentChat(null);
-        // Clear the messages display
-        setMessages([]); 
-        // Navigate back to the form page
-        navigate('/'); 
+      return chatId;
+    },
+    onSuccess: (deletedChatId) => {
+      queryClient.invalidateQueries({ queryKey: ['dashboardStats', currentUser?.id] });
+      const originalChats = [...chats];
+      const updatedChats = originalChats.filter(chat => chat.id !== deletedChatId);
+      setChats(updatedChats);
+      toast({ title: "Chat Deleted" });
+      if (currentChat === deletedChatId) {
+        const deletedIndex = originalChats.findIndex(chat => chat.id === deletedChatId);
+        let nextChatId: string | null = null;
+        if (updatedChats.length > 0) { nextChatId = deletedIndex > 0 ? updatedChats[deletedIndex - 1].id : updatedChats[0].id; }
+        if (nextChatId) { setTimeout(() => handleChatSelect(nextChatId!), 0); }
+         else { setCurrentChat(null); setMessages([]); }
       }
-
-    // Catch errors during deletion process
-    } catch (error) {
-      // Log the deletion error
-      console.error("Error deleting chat:", error);
-      // Show an error toast
-      toast({ title: "Delete Error", description: "Failed to delete the chat.", variant: "destructive" });
+    },
+    onError: (error) => {
+      console.error("Mutation Error: Error deleting chat:", error);
+      toast({ 
+        title: "Delete Error", 
+        description: "Failed to delete the chat. Please try again.", 
+        variant: "destructive" 
+      });
     }
-  // Dependencies for the useCallback hook
-  }, [currentUser, currentChat, navigate]);
+  });
+  
+  const handleDeleteChat = useCallback((chatId: string) => {
+    if (!currentUser) { /* Toast */ return; }
+    deleteChatMutation.mutate(chatId);
+  }, [currentUser, deleteChatMutation]);
 
   // --- Render Logic --- 
 
-  // Loading state indicator (simplistic version)
-  // Display loading only if messages are empty AND user isn't logged in yet (initial load)
-  if (messages.length === 0 && currentUser === undefined) { 
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#1A052E] to-[#2D0A4E]">
-        <p className="text-white animate-pulse">Loading Chat...</p> 
+
+  return (
+    <div className="flex flex-col h-screen">
+         <div className="min-h-screen bg-gradient-to-br from-[#10031F] to-[#1F063A] p-4 flex relative overflow-hidden">
+      <div className="absolute top-0 left-0 w-96 h-96 bg-gradient-radial from-[#FF2EE6]/20 via-transparent to-transparent rounded-full -translate-x-1/4 -translate-y-1/4 blur-3xl opacity-60 animate-pulse-slow pointer-events-none"></div>
+      <div className="absolute bottom-0 right-0 w-80 h-80 bg-gradient-radial from-[#00FFCC]/15 via-transparent to-transparent rounded-full translate-x-1/4 translate-y-1/4 blur-3xl opacity-70 animate-pulse-slow-delay pointer-events-none"></div>
+      
+      {currentUser && (
+        <ChatHistorySidebar 
+            chats={chats}
+            currentChat={currentChat}
+            currentUser={currentUser}
+            onChatSelect={handleChatSelect}
+            onNewChat={handleNewChat}
+            onDeleteChat={handleDeleteChat}
+          />
+      )}
+      <div className={`flex-1 ${currentUser ? 'md:ml-4' : 'mx-auto'} max-w-4xl flex flex-col h-[calc(100vh-2rem)] z-10 min-h-[300px]`}> 
+        <div className="md:hidden p-2 sticky top-0 bg-[#10031F]/80 backdrop-blur-sm z-20 flex items-center"> 
+          <Button variant="ghost" size="icon" onClick={toggleSidebar} className="text-purple-300 hover:text-white hover:bg-purple-500/20" aria-label="Toggle chat history sidebar">
+            <PanelLeft className="h-5 w-5" />
+          </Button>
+        </div>
+        <ChatInterface 
+            messages={messages}
+            inputValue={inputValue}
+            isLoading={isLoading || deleteChatMutation.isPending}
+            onSendMessage={handleSendMessage}
+            onInputChange={setInputValue}
+          />
       </div>
-    );
+    </div>
+    </div>
+   
+  );
+};
+
+// --- Outer Component (Handles Auth Check & Provider) --- 
+const GeneratedCopy = () => {
+  const navigate = useNavigate();
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    let unsubscribe: (() => void) | null = null; // Variable to hold the unsubscribe function
+
+    const checkAuthAndListen = async () => {
+      try {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error("Error getting session:", sessionError);
+          // Decide how to handle session errors, maybe show error state?
+          if (isMounted) setInitialLoadComplete(true); // Mark load complete even on error? Or navigate?
+          return;
+        }
+
+        if (!session && isMounted) {
+          console.log("No session, redirecting...");
+          navigate('/auth?redirect=/generated-copy');
+          // No need to set load complete here, redirect handles it
+          return;
+        } else if (session && isMounted) {
+          console.log("Session found.");
+          setInitialLoadComplete(true);
+        }
+
+        // Setup listener only if initial check passed or is ongoing
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+          if (!isMounted) return;
+          console.log(`Auth event: ${event}`);
+          if (event === 'SIGNED_OUT') {
+            setInitialLoadComplete(false); // Reset loading state
+            navigate('/auth');
+          } else if (event === 'SIGNED_IN') {
+            // Ensure load is marked complete if user signs in
+            if (!initialLoadComplete) setInitialLoadComplete(true);
+          }
+        });
+        
+        // Store the unsubscribe function
+        unsubscribe = subscription.unsubscribe; 
+
+      } catch (error) {
+         console.error("Error in checkAuthAndListen:", error);
+         // Handle unexpected errors if needed
+         if (isMounted) setInitialLoadComplete(true); // Allow rendering potentially?
+      }
+    };
+
+    checkAuthAndListen();
+
+    // Cleanup function for the useEffect hook
+    return () => {
+      isMounted = false;
+      if (unsubscribe) {
+        console.log("Unsubscribing from auth state changes.");
+        unsubscribe();
+      }
+    };
+  }, [navigate]); // Only navigate is a dependency
+
+  // Loading indicator
+  if (!initialLoadComplete) {
+     return (
+       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#1A052E] to-[#2D0A4E]">
+         <p className="text-white animate-pulse">Initializing Chat...</p> 
+       </div>
+     ); 
   }
 
-  // Main component render
+  // Render the provider and layout once auth is checked
   return (
-    // Provide sidebar context
     <SidebarProvider>
-      {/* Main container div with background and layout */}
-      <div className="min-h-screen bg-gradient-to-br from-[#10031F] to-[#1F063A] p-4 flex relative overflow-hidden">
-          {/* Decorative background elements */}
-          <div className="absolute top-0 left-0 w-96 h-96 bg-gradient-radial from-[#FF2EE6]/20 via-transparent to-transparent rounded-full -translate-x-1/4 -translate-y-1/4 blur-3xl opacity-60 animate-pulse-slow pointer-events-none"></div>
-          <div className="absolute bottom-0 right-0 w-80 h-80 bg-gradient-radial from-[#00FFCC]/15 via-transparent to-transparent rounded-full translate-x-1/4 translate-y-1/4 blur-3xl opacity-70 animate-pulse-slow-delay pointer-events-none"></div>
-          
-         {/* Render sidebar only if user is logged in */}
-        {currentUser && (
-        <ChatHistorySidebar 
-            chats={chats} // Pass chat history list
-            currentChat={currentChat} // Pass current active chat ID
-            currentUser={currentUser} // Pass current user object
-            onChatSelect={handleChatSelect} // Pass chat selection handler
-            onNewChat={handleNewChat} // Pass new chat handler
-            onDeleteChat={handleDeleteChat} // Pass delete chat handler
-          />
-        )}
-        
-        {/* Main Chat Area Container */}
-        <div className={`flex-1 ${currentUser ? 'ml-4' : 'mx-auto'} max-w-4xl flex flex-col h-[calc(100vh-2rem)] z-10 min-h-[300px]`}>
-          {/* Chat Interface Component */}
-          <ChatInterface 
-            messages={messages} // Pass messages array
-            inputValue={inputValue} // Pass current input value
-            isLoading={isLoading} // Pass loading state
-            onSendMessage={handleSendMessage} // Pass message sending handler
-            onInputChange={setInputValue} // Pass input change handler
-          />
-        </div>
-      </div>
+      <GeneratedCopyLayout />
     </SidebarProvider>
   );
 };
 
-// Export the component as default
 export default GeneratedCopy;
+
+
