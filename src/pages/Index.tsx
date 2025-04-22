@@ -1,9 +1,8 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { supabase } from '@/integrations/supabase/client';
-import { Sparkles, ArrowRight, Check, Star, Rocket, LightBulb, TrendingUp, MessageSquare } from 'lucide-react';
+import { Sparkles, ArrowRight, Check, Star, Rocket, Lightbulb, TrendingUp, MessageSquare } from 'lucide-react';
 import { User } from '@supabase/supabase-js';
 
 const Index = () => {
@@ -173,7 +172,7 @@ const Index = () => {
                 description: "Generate multiple variations of high-quality copy in seconds, not hours or days."
               },
               {
-                icon: <LightBulb className="h-10 w-10 text-[#00FFCC]" />,
+                icon: <Lightbulb className="h-10 w-10 text-[#00FFCC]" />,
                 title: "Overcome Writer's Block",
                 description: "Never stare at a blank page again. Get instant inspiration and ready-to-use copy for any marketing need."
               },
