@@ -45,7 +45,6 @@ const saveDataForUser = async (userId: string, input: CopywritingInput, generate
         niche: input.niche, // Update/set the niche
         product_name: input.productName, // Update/set the product name
         product_description: input.productDescription, // Update/set the product description
-        updated_at: new Date() // Set the last updated timestamp
       }, { onConflict: 'user_id' }); // Specify that 'user_id' is the conflict column for upsert
       
     // If there was an error updating the profile, log it as a warning
