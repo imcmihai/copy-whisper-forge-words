@@ -23,7 +23,8 @@ serve(async (req: Request) => {
       textFormat, 
       textLength, 
       keywords, 
-      textObjective 
+      textObjective ,
+      language
     } = await req.json();
 
     const prompt = `Act as a professional copywriter with years of experience. Create compelling copywriting text for the following product, strictly adhering to the details provided:
@@ -32,7 +33,7 @@ Niche: ${niche || 'Unspecified'}
 Product Name: ${productName || 'Unspecified'}
 Product Description: ${productDescription || 'Unspecified'}
 
-CRITICAL INSTRUCTION: Analyze the language used in the Niche, Product Name, and Product Description fields above. Generate the final output text EXCLUSIVELY in that same language. For example, if the inputs are in French, the output must be in French. If they are in English, the output must be English. Do NOT use any other language for the final generated text.
+CRITICAL INSTRUCTION: The text should be written in ${language}
 
 Additional Details:
 Tone: ${tone || 'Unspecified'}

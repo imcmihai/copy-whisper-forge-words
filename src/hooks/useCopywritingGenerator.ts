@@ -16,6 +16,7 @@ export interface CopywritingInput {
   textLength: string; // Desired length indicator (short, medium, long, specific count)
   keywords: string; // Keywords to include
   textObjective: string; // Main goal of the text (sales, info, engagement)
+  language: string; // ADDED: Language for the generated text
 }
 
 // Helper function to save generated text and profile data for logged-in users

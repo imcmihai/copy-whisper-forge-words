@@ -25,7 +25,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
   };
 
   const handleCreateCopyClick = () => {
-    navigate('/');
+    navigate('/copywriting-form');
   };
 
   const handleChatClick = () => {

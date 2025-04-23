@@ -3,7 +3,7 @@ import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 import { Label } from '../components/ui/label';
 import { useCopywritingGenerator, CopywritingInput } from '../hooks/useCopywritingGenerator';
-import { Wand2, SendHorizontal, Sparkles, Target, Mic, ListChecks, Scale, Key, Goal } from 'lucide-react';
+import { Wand2, SendHorizontal, Sparkles, Target, Mic, ListChecks, Scale, Key, Goal, Globe, LanguagesIcon } from 'lucide-react';
 
 // Define props interface including onSuccess
 interface CopywritingFormProps {
@@ -21,7 +21,8 @@ export const CopywritingForm: React.FC<CopywritingFormProps> = (/*{ onSuccess }*
     textFormat: '',
     textLength: '',
     keywords: '',
-    textObjective: ''
+    textObjective: '',
+    language: ''
   });
 
   // Get the generation function and loading state from the hook
@@ -181,6 +182,19 @@ export const CopywritingForm: React.FC<CopywritingFormProps> = (/*{ onSuccess }*
             value={input.textObjective}
             onChange={handleInputChange}
             placeholder="Ex: sales, informing, engaging"
+            className={inputClassName}
+          />
+        </div>
+
+        <div className="space-y-2 md:col-span-2">
+          <Label className="text-white/90 flex items-center gap-2">
+             <LanguagesIcon className="h-4 w-4 text-[#00FFCC]" /> Language
+          </Label>
+          <Input // Consider Textarea for more detail
+            name="language"
+            value={input.language}
+            onChange={handleInputChange}
+            placeholder="The language you want the text to be written in"
             className={inputClassName}
           />
         </div>
