@@ -10,7 +10,7 @@ import { ChatInterface } from '@/components/chat/ChatInterface';
 import { User } from '@supabase/supabase-js';
 import { CopywritingInput } from '@/hooks/useCopywritingGenerator';
 import { Button } from '@/components/ui/button';
-import { PanelLeft } from 'lucide-react';
+import { LayoutDashboard, PanelLeft } from 'lucide-react';
 
 interface Message {
   id: string;
@@ -288,7 +288,15 @@ const GeneratedCopyLayout = () => {
              if (!initialInput && !currentChat && combinedHistory.length > 0) {
                 const latestChatId = combinedHistory[0].id;
                 console.log(`Direct navigation: Auto-selecting latest chat ${latestChatId}`);
-                setTimeout(() => { if (isMounted) { handleChatSelect(latestChatId); } }, 0);
+                setTimeout(() => {
+                  if (isMounted) {
+                    if (user) {
+                      handleChatSelect(latestChatId);
+                    } else {
+                      console.warn("Auto-select chat aborted: User became null before selection.");
+                    }
+                  }
+                }, 0);
              }
           }
         }
@@ -395,8 +403,8 @@ const GeneratedCopyLayout = () => {
   return (
     <div className="flex flex-col h-screen">
          <div className="min-h-screen bg-gradient-to-br from-[#10031F] to-[#1F063A] p-4 flex relative overflow-hidden">
-      <div className="absolute top-0 left-0 w-96 h-96 bg-gradient-radial from-[#FF2EE6]/20 via-transparent to-transparent rounded-full -translate-x-1/4 -translate-y-1/4 blur-3xl opacity-60 animate-pulse-slow pointer-events-none"></div>
-      <div className="absolute bottom-0 right-0 w-80 h-80 bg-gradient-radial from-[#00FFCC]/15 via-transparent to-transparent rounded-full translate-x-1/4 translate-y-1/4 blur-3xl opacity-70 animate-pulse-slow-delay pointer-events-none"></div>
+            <div className="absolute top-0 left-0 w-96 h-96 bg-gradient-radial from-[#FF2EE6]/20 via-transparent to-transparent rounded-full -translate-x-1/4 -translate-y-1/4 blur-3xl opacity-60 animate-pulse-slow pointer-events-none"></div>
+            <div className="absolute bottom-0 right-0 w-80 h-80 bg-gradient-radial from-[#00FFCC]/15 via-transparent to-transparent rounded-full translate-x-1/4 translate-y-1/4 blur-3xl opacity-70 animate-pulse-slow-delay pointer-events-none"></div>
       
       {currentUser && (
         <ChatHistorySidebar 
@@ -408,7 +416,16 @@ const GeneratedCopyLayout = () => {
             onDeleteChat={handleDeleteChat}
           />
       )}
-      <div className={`flex-1 ${currentUser ? 'md:ml-4' : 'mx-auto'} max-w-4xl flex flex-col h-[calc(100vh-2rem)] z-10 min-h-[300px]`}> 
+      <div className={`relative flex-1 ${currentUser ? 'md:ml-4' : 'mx-auto'} max-w-4xl flex flex-col h-[calc(100vh-2rem)] z-10 min-h-[300px]`}> 
+        <Button
+          variant="ghost"
+          onClick={() => navigate('/dashboard')}
+          className="absolute top-2 right-2 text-purple-300 hover:text-white hover:bg-purple-500/20 z-30 flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm"
+          title="Go to Dashboard"
+        >
+          <LayoutDashboard className="h-5 w-5" />
+          <span>Dashboard</span>
+        </Button>
         <div className="md:hidden p-2 sticky top-0 bg-[#10031F]/80 backdrop-blur-sm z-20 flex items-center"> 
           <Button variant="ghost" size="icon" onClick={toggleSidebar} className="text-purple-300 hover:text-white hover:bg-purple-500/20" aria-label="Toggle chat history sidebar">
             <PanelLeft className="h-5 w-5" />
@@ -423,8 +440,7 @@ const GeneratedCopyLayout = () => {
           />
       </div>
     </div>
-    </div>
-   
+   </div>
   );
 };
 

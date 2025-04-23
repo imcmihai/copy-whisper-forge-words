@@ -1,9 +1,23 @@
 import { CopywritingForm } from '@/components/CopywritingForm';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, LayoutDashboard } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useNavigate } from 'react-router-dom';
 
 const CopywritingFormPage = () => {
+  const navigate = useNavigate();
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#1A052E] to-[#2D0A4E] p-4 flex flex-col items-center justify-center relative">
+      <Button 
+        variant="ghost" 
+        onClick={() => navigate('/dashboard')}
+        className="absolute top-4 right-4 text-purple-300 hover:text-white hover:bg-purple-500/20 z-20 flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm"
+        title="Go to Dashboard"
+      >
+        <LayoutDashboard className="h-5 w-5" />
+        <span>Dashboard</span>
+      </Button>
+
       <div className="w-full max-w-2xl relative">
         <div className="absolute inset-0 bg-gradient-to-r from-[#FF2EE6] via-[#6C22BD] to-[#00FFCC] opacity-10 blur-3xl animate-gradient -z-10" />
         

@@ -206,6 +206,7 @@ export const CopywritingForm: React.FC<CopywritingFormProps> = (/*{ onSuccess }*
             disabled={isLoading}
             className="w-full mt-4 bg-gradient-to-r from-[#FF2EE6] to-[#00FFCC] hover:opacity-90 text-white font-medium py-2.5 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(255,46,230,0.5)]"
           >
+
             {isLoading ? (
               <>
                 <Wand2 className="h-5 w-5 animate-spin" />

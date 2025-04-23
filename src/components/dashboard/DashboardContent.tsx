@@ -155,7 +155,7 @@ export function DashboardContent({ user }: DashboardContentProps) {
           <CardContent className="space-y-3">
             <Button 
               onClick={handleCreateNewCopy}
-              className="w-full bg-gradient-to-r from-[#6C22BD] to-[#9b87f5] text-white font-medium py-2 rounded-md transition-all duration-200 hover:opacity-90"
+              className="w-full bg-gradient-to-r from-[#6C22BD] to-[#9b87f5] text-white font-medium py-2 rounded-md transition-all duration-200 hover:text-black hover:bg-white"
             >
               <PlusCircle className="mr-2 h-4 w-4" />
               New Copy
@@ -163,7 +163,7 @@ export function DashboardContent({ user }: DashboardContentProps) {
             <Button 
               onClick={handleGoToChats}
               variant="outline" 
-              className="w-full border-purple-500/30 text-white hover:bg-purple-500/20"
+              className="w-full border-purple-500/30 text-purple-900 hover:bg-purple-500/20 hover:text-white"
             >
               <MessageSquare className="mr-2 h-4 w-4" />
               View Chats

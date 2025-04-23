@@ -29,14 +29,7 @@ export const Hero = ({ onCTAClick }: HeroProps) => {
             >
               Start Creating Copy <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
-            
-            <Button 
-              variant="outline"
-              size="lg"
-              className="border-purple-500/30 hover:bg-purple-500/20 text-white py-6 px-8 text-lg rounded-xl"
-            >
-              View Examples
-            </Button>
+
           </div>
           
           <div className="text-purple-300 flex items-center gap-6 justify-center md:justify-start">

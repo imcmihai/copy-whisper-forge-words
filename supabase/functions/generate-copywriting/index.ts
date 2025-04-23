@@ -27,43 +27,50 @@ serve(async (req: Request) => {
       language
     } = await req.json();
 
-    const prompt = `Act as a professional copywriter with years of experience. Create compelling copywriting text for the following product, strictly adhering to the details provided:
+    const prompt = `You are a professional copywriter with years of experience. Your task is to create highly engaging and persuasive marketing copy based on the following product details.
 
-Niche: ${niche || 'Unspecified'}
-Product Name: ${productName || 'Unspecified'}
-Product Description: ${productDescription || 'Unspecified'}
 
-CRITICAL INSTRUCTION: The text should be written in ${language}
 
-Additional Details:
-Tone: ${tone || 'Unspecified'}
-Target Audience: ${targetPublic || 'General'}
-Text Format: ${textFormat || 'Unspecified'}
-Text Length: ${textLength || 'Unspecified'}
-Keywords to Include: ${keywords || 'None'}
-Text Objective: ${textObjective || 'Unspecified'}
 
-CRITICAL INSTRUCTION: You have to respect the Text Format and Text Length. ##Pay attention to the text objective. Make sure you are generating the text according to the text objective.##
+⚠️IMPORTANT: WRITE ONLY IN ${language.toUpperCase()}. DO NOT MIX LANGUAGES. DO NOT WRITE IN ROMANIAN OR ANY OTHER LANGUAGE.
 
-IMPORTANT REQUIREMENTS FOR TEXT FORMAT:
-- Do not use special characters like "#", "*", "^", etc., in the text.
-- Ensure the text is clear, professional, and easy to read.
-- Preserve the original meaning and intent.
-- Use plain text with standard punctuation.
-- Do not include markdown or other special formatting.
+---
 
-Use the following principles when creating the text:
-0. The text should be conversational and personal.
-1. Prioritize message impact and clarity.
-2. Structure content for maximum readability.
-3. Use creativity and storytelling.
-4. Adopt a conversational and friendly tone (as indicated by Tone).
-5. Educate and empower the reader (considering Target Audience).
-6. Balance practical information with captivating elements.
-7. Deepen the emotional connection.
-8. Include strong calls-to-action (aligned with Text Objective).
+📦 Product Details:
+- Niche: ${niche || 'Unspecified'}
+- Product Name: ${productName || 'Unspecified'}
+- Product Description: ${productDescription || 'Unspecified'}
+
+✍️ Writing Requirements:
+1. Format: ${textFormat || 'Unspecified'}
+2. Text Length: ${textLength || 'Unspecified'} words
+3. Objective: ${textObjective || 'Unspecified'}
+4. Tone: ${tone || 'Unspecified'} (must match objective and target audience)
+5. Target Audience: ${targetPublic || 'General'}
+6. Keywords to use heavily for SEO: ${keywords || 'Unspecified'}
+
+---
+
+🧠 Use the following principles when writing:
+0. The text must be conversational and personal.
+1. Prioritize impact and clarity.
+2. Structure content for readability.
+3. Include storytelling and creativity.
+4. Keep the tone friendly and consistent.
+5. Educate and empower the reader.
+6. Balance information with captivating elements.
+7. Build emotional connection.
+8. Include strong, clear calls-to-action.
 9. Use sensory and descriptive language.
-10. Personalize the message for the audience (considering Target Audience).
+10. Personalize based on the audience profile.
+
+---
+
+❌ Do NOT use special characters like "#", "*", "^", etc.
+✅ Use plain text only. No markdown or other formatting.
+✅ Ensure the message is professional, clean, and easy to read.
+
+📌 CRITICAL: THE ENTIRE TEXT MUST BE WRITTEN IN ${language.toUpperCase()} ONLY.
 `;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -73,7 +80,7 @@ Use the following principles when creating the text:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini', // Using the cheaper model to be cost-effective
+        model: 'gpt-4.1', // Using the cheaper model to be cost-effective
         messages: [
           { role: 'system', content: 'You are a professional copywriter with years of experience in creating compelling marketing copy.' },
           { role: 'user', content: prompt }

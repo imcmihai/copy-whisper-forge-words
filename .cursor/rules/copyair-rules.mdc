@@ -1,6 +1,6 @@
 ---
 description: Product Requirements Document for Copy Whisper AI Copywriter
-globs:
+globs: 
   - src/**
 alwaysApply: true
 ---

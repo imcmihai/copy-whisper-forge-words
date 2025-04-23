@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { SidebarContent, SidebarGroup, SidebarMenu, SidebarMenuItem, SidebarMenuButton, Sidebar } from '../../components/ui/sidebar';
 import { MessageSquare, Plus, X } from 'lucide-react';
 import { User } from '@supabase/supabase-js';
 import { Button } from '../../components/ui/button';
 import { toast } from '../../components/ui/use-toast';
-import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   AlertDialog,
   AlertDialogAction,

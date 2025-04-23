@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,6 +8,7 @@ import { Features } from '@/components/landing/Features';
 import { Testimonials } from '@/components/landing/Testimonials';
 import { CallToAction } from '@/components/landing/CallToAction';
 import { Footer } from '@/components/landing/Footer';
+import { AppPreview } from '@/components/landing/AppPreview';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -47,7 +47,7 @@ const Index = () => {
       <Navbar currentUser={currentUser} isLoading={isLoading} />
       <Hero onCTAClick={handleCTAClick} />
       <Features />
-      <Testimonials />
+      <AppPreview />
       <CallToAction onCTAClick={handleCTAClick} />
       <Footer />
     </div>
