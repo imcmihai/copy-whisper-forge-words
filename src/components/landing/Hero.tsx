@@ -32,14 +32,7 @@ export const Hero = ({ onCTAClick }: HeroProps) => {
 
           </div>
           
-          <div className="text-purple-300 flex items-center gap-6 justify-center md:justify-start">
-            <div className="flex -space-x-2">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 border-2 border-[#1A052E]"></div>
-              ))}
-            </div>
-            <p>Trusted by 10,000+ marketers</p>
-          </div>
+  
         </div>
         
         <div className="flex-1 relative">

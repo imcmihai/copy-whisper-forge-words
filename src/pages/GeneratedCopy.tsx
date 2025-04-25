@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
-import { Card } from '@/components/ui/card';
 import { supabase } from '../integrations/supabase/client';
 import { toast } from '../components/ui/use-toast';
 import { SidebarProvider, useSidebar } from '../components/ui/sidebar';

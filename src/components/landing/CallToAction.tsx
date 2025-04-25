@@ -18,7 +18,7 @@ export const CallToAction = ({ onCTAClick }: CTAProps) => {
           </h2>
           
           <p className="text-xl text-purple-200 mb-10 max-w-3xl mx-auto relative z-10">
-            Join thousands of marketers who are saving time and increasing conversions with AI-powered copywriting.
+            Join our community of copywriters who are saving time and increasing conversions with AI-powered copywriting.
           </p>
           
           <Button 

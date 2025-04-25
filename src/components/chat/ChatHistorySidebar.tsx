@@ -105,7 +105,7 @@ export const ChatHistorySidebar = ({ chats, currentChat, currentUser, onChatSele
                     variant="ghost"
                     size="icon"
                     onClick={(e) => openDeleteConfirm(chat.id, e)}
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 h-7 w-7 text-gray-400 hover:text-red-500 hover:bg-red-500/15 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-out rounded-md z-10"
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 h-7 w-7 text-gray-400 hover:text-red-500 hover:bg-red-500/15 transition-opacity duration-200 ease-out rounded-md z-10"
                     title="Delete Chat"
                   >
                     <X className="h-5 w-5" />

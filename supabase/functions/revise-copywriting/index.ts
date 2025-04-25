@@ -61,7 +61,7 @@ Personalize the message for the audience`
       }
     }
 
-    messages.push({ role: 'user', content: `Te rog să revizuiești acest text în baza următoarelor instrucțiuni: ${userInstructions}` });
+    messages.push({ role: 'user', content: `Please revise the following text based on the user's instructions: ${userInstructions}` });
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
