@@ -6,11 +6,17 @@ const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  if (!openAIApiKey) {
+    console.error("FATAL: OPENAI_API_KEY environment variable not set.");
+    return new Response(JSON.stringify({ error: 'Server configuration error.' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
   }
 
   try {
@@ -24,8 +30,16 @@ serve(async (req: Request) => {
       textLength, 
       keywords, 
       textObjective ,
-      language
+      language,
+      model
     } = await req.json();
+
+    if (!language) {
+      return new Response(JSON.stringify({ error: 'Missing language parameter' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+    }
+
+    const selectedModel = model || 'gpt-4o-mini';
+    console.log(`Generating copy with model: ${selectedModel}`);
 
     const prompt = `You are a professional copywriter with years of experience. Your task is to create highly engaging and persuasive marketing copy based on the following product details.
 
@@ -80,7 +94,7 @@ serve(async (req: Request) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4.1', // Using the cheaper model to be cost-effective
+        model: selectedModel,
         messages: [
           { role: 'system', content: 'You are a professional copywriter with years of experience in creating compelling marketing copy.' },
           { role: 'user', content: prompt }
@@ -88,17 +102,33 @@ serve(async (req: Request) => {
       }),
     });
 
-    const data = await response.json();
-    const generatedText = data.choices[0].message.content;
+    const responseData = await response.json();
+
+    if (!response.ok) {
+      console.error('OpenAI API error:', responseData);
+      const errorDetail = responseData.error?.message || `HTTP status ${response.status}`;
+      throw new Error(`OpenAI API request failed: ${errorDetail}`);
+    }
+    
+    const generatedText = responseData.choices?.[0]?.message?.content;
+
+    if (!generatedText) {
+      console.error('No generated text found in OpenAI response:', responseData);
+      throw new Error('Generation failed: No content returned from OpenAI.');
+    }
 
     return new Response(JSON.stringify({ generatedText }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Error in generate-copywriting function:', error);
     const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+    let status = 500; 
+    if (errorMessage.includes('OpenAI API request failed')) { status = 502; } 
+    else if (errorMessage.includes('Missing language parameter')) { status = 400; }
+    
     return new Response(JSON.stringify({ error: errorMessage }), {
-      status: 500,
+      status: status,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

@@ -1,14 +1,17 @@
 import { User } from '@supabase/supabase-js';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, MessageSquare, TrendingUp, Clock, Star } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables } from '@/integrations/supabase/types';
+import { UserSubscription } from '@/lib/api';
+import ActiveChatsDisplay from '@/components/ActiveChatsDisplay';
 
 interface DashboardContentProps {
   user: User | null;
+  subscription: UserSubscription | null;
 }
 
 // --- React Query Fetching Functions ---
@@ -45,7 +48,7 @@ const fetchRecentCopies = async (userId: string) => {
   return copies || [];
 };
 
-export function DashboardContent({ user }: DashboardContentProps) {
+export function DashboardContent({ user, subscription }: DashboardContentProps) {
   const navigate = useNavigate();
   const userId = user?.id;
 
@@ -79,22 +82,69 @@ export function DashboardContent({ user }: DashboardContentProps) {
     navigate('/generated-copy');
   };
 
+  // Helper to capitalize tier name
+  const capitalize = (s: string | null | undefined) => s ? s.charAt(0).toUpperCase() + s.slice(1) : 'Free';
+
   // --- Render Logic ---
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold neon-text">Dashboard</h1>
-        <Button 
-          onClick={handleCreateNewCopy}
-          className="bg-gradient-to-r from-[#FF2EE6] to-[#00FFCC] text-white font-semibold px-4 py-2 rounded-md transition-all duration-200 hover:opacity-90"
-        >
-          <PlusCircle className="mr-2 h-5 w-5" />
-          Create New Copy
-        </Button>
+    <div className="flex-1 overflow-y-auto p-6 md:p-8">
+      {/* --- User/Subscription Info Header --- */}
+      <div className="mb-8 p-6 border border-purple-500/20 rounded-lg bg-white/5 backdrop-blur-lg shadow-lg">
+          <h1 className="text-2xl md:text-3xl font-bold text-white mb-4">
+              Welcome back, <span className="neon-text">{user?.email || 'User'}</span>
+          </h1>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+              {/* Current Plan Display */}
+              <div className="bg-white/10 p-4 rounded-md">
+                  <p className="text-sm text-purple-300 mb-1">Current Plan</p>
+                  <p className="font-semibold text-lg text-white capitalize">
+                      {capitalize(subscription?.tier)} 
+                  </p>
+              </div>
+              
+              {/* Replace CreditDisplay with ActiveChatsDisplay */}
+              <div className="md:col-span-1">
+                  <ActiveChatsDisplay />
+              </div>
+
+              {/* Upgrade Button */} 
+              {subscription?.tier !== 'pro' && (
+                  <div className="flex items-center justify-center md:justify-end h-full">
+                      <Button 
+                          asChild
+                          className="bg-gradient-to-r from-[#FF2EE6] to-[#00FFCC] text-white font-semibold px-5 py-2.5 rounded-md transition-all duration-200 hover:opacity-90 shadow-md"
+                      >
+                          <Link to="/pricing">Upgrade Plan</Link>
+                      </Button>
+                  </div>
+              )}
+          </div>
       </div>
 
-      {/* Stats Section */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      {/* Action Buttons Bar */} 
+      <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
+        <h2 className="text-2xl font-semibold text-white">Overview</h2>
+        <div className="flex gap-3">
+            <Button 
+              onClick={handleCreateNewCopy}
+              className="bg-gradient-to-r from-[#6C22BD] to-[#9b87f5] text-white font-medium py-2 px-4 rounded-md transition-all duration-200 hover:text-black hover:bg-white shadow-sm"
+            >
+              <PlusCircle className="mr-2 h-4 w-4" />
+              New Copy
+            </Button>
+            <Button 
+              onClick={handleGoToChats}
+              variant="outline" 
+              className="border-purple-500/30 text-purple-300 hover:bg-purple-500/20 hover:text-white py-2 px-4 rounded-md shadow-sm"
+            >
+              <MessageSquare className="mr-2 h-4 w-4" />
+              View Chats
+            </Button>
+        </div>
+      </div>
+
+      {/* Stats & Tips Section */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         <Card className="bg-white/5 backdrop-blur-lg border-purple-500/20 text-white">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg flex items-center">
@@ -144,32 +194,8 @@ export function DashboardContent({ user }: DashboardContentProps) {
             </ul>
           </CardContent>
         </Card>
-
-        <Card className="bg-white/5 backdrop-blur-lg border-purple-500/20 text-white">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex items-center">
-              <Clock className="mr-2 h-5 w-5 text-[#9b87f5]" />
-              Quick Actions
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Button 
-              onClick={handleCreateNewCopy}
-              className="w-full bg-gradient-to-r from-[#6C22BD] to-[#9b87f5] text-white font-medium py-2 rounded-md transition-all duration-200 hover:text-black hover:bg-white"
-            >
-              <PlusCircle className="mr-2 h-4 w-4" />
-              New Copy
-            </Button>
-            <Button 
-              onClick={handleGoToChats}
-              variant="outline" 
-              className="w-full border-purple-500/30 text-purple-900 hover:bg-purple-500/20 hover:text-white"
-            >
-              <MessageSquare className="mr-2 h-4 w-4" />
-              View Chats
-            </Button>
-          </CardContent>
-        </Card>
+        
+        <Card className="hidden lg:block bg-transparent border-none"></Card>
       </div>
 
       {/* Recent Copies Section */}

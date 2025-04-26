@@ -72,25 +72,7 @@ export const ChatInterface = ({
         </div>
       </ScrollArea>
 
-      <form onSubmit={onSendMessage} className="p-4 border-t border-purple-500/30 glassmorphism">
-        <div className="flex gap-2">
-          <Input
-            value={inputValue}
-            onChange={(e) => onInputChange(e.target.value)}
-            placeholder="Type your revision request..."
-            disabled={isLoading}
-            className="flex-1 bg-[#2D0A4E]/60 border-purple-500/30 focus-visible:ring-[#FF2EE6] text-white placeholder:text-gray-400 backdrop-blur-md"
-          />
-          <Button 
-            type="submit" 
-            size="icon" 
-            disabled={isLoading}
-            className="bg-[#FF2EE6] hover:bg-[#FF2EE6]/80 text-white neon-glow"
-          >
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-        </div>
-      </form>
+     
     </div>
   );
 };

@@ -19,6 +19,11 @@ export interface CopywritingInput {
   language: string; // ADDED: Language for the generated text
 }
 
+// Define the structure for the generation function arguments, including the model
+export interface GenerateCopywritingPayload extends CopywritingInput {
+    model: string; // Add the selected model
+}
+
 // Helper function to save generated text and profile data for logged-in users
 const saveDataForUser = async (userId: string, input: CopywritingInput, generatedText: string): Promise<void> => {
   // Wrap saving logic in a try-catch block for error handling
@@ -78,8 +83,8 @@ export const useCopywritingGenerator = () => {
   // Hook to get the navigation function from react-router-dom
   const navigate = useNavigate();
 
-  // Async function to perform the copywriting generation
-  const generateCopywriting = async (input: CopywritingInput) => {
+  // Update function signature to accept payload including model
+  const generateCopywriting = async (payload: GenerateCopywritingPayload) => {
     // Set loading state to true at the beginning of the process
     setIsLoading(true);
 
@@ -92,10 +97,10 @@ export const useCopywritingGenerator = () => {
       // Get the user ID if the user is logged in, otherwise null
       const userId = session?.user?.id;
 
-      // Invoke the 'generate-copywriting' Supabase Edge Function
+      // Invoke the Edge Function, passing the entire payload (including model)
       const { data: generatedData, error: openAiError } = await supabase.functions.invoke(
-        'generate-copywriting', // Name of the Edge Function
-        { body: input } // Pass the form input as the request body
+        'generate-copywriting',
+        { body: payload } // Pass the full payload with input + model
       );
 
       // If there was an error invoking the Edge Function, throw it
@@ -104,10 +109,14 @@ export const useCopywritingGenerator = () => {
       // Extract the generated text from the function's response data
       const generatedText = generatedData.generatedText;
 
+      // Extract input fields from payload for saving (excluding model)
+      const inputFields: CopywritingInput = { ...payload };
+      delete (inputFields as any).model; // Remove model before saving to avoid type mismatch
+
       // If the user is logged in and we have their ID, save the data
       if (isLoggedIn && userId) {
-        // Call the helper function to save text and profile data
-        await saveDataForUser(userId, input, generatedText);
+        // Pass only the input fields to saveDataForUser
+        await saveDataForUser(userId, inputFields, generatedText);
       } 
 
       // Show a success toast notification to the user
@@ -122,7 +131,7 @@ export const useCopywritingGenerator = () => {
         { 
           state: { // Pass state via navigation
             generatedText: generatedText, // Include the generated text
-            initialInput: input // Include the original input for context
+            initialInput: inputFields // Pass the input fields without model
           } 
         }
       );
