@@ -115,8 +115,33 @@ const PricingPage = () => {
           {plans.map((plan) => {
             const isCurrentPlan = subscription?.tier === plan.tier;
             const isLoading = loadingPriceId === plan.stripePriceId;
-            const buttonAction = plan.stripePriceId ? () => handleSubscribe(plan.stripePriceId as string) : undefined;
-            const buttonDisabled = isLoading || isCurrentPlan || (plan.tier === 'free' && subscription?.tier === 'free'); 
+            
+            // --- Adjusted Logic for Free Plan --- 
+            let buttonAction: (() => void) | undefined;
+            let buttonDisabled = isLoading || isCurrentPlan;
+            let buttonText = plan.buttonText;
+            let buttonVariant = plan.buttonVariant;
+
+            if (plan.tier === 'free') {
+              if (user) {
+                // Logged in: Button disabled if already on free plan
+                buttonDisabled = true; // Always disable free plan button for logged-in users
+                buttonText = isCurrentPlan ? 'Current Plan' : 'Get Started'; // Show 'Current Plan' if applicable
+              } else {
+                // Not logged in: Button navigates to auth
+                buttonAction = () => navigate('/auth');
+                buttonDisabled = false; // Enable for non-logged-in users
+              }
+            } else if (plan.stripePriceId) {
+              // Paid plans: Original logic
+              buttonAction = () => handleSubscribe(plan.stripePriceId as string);
+            }
+
+            // Set variant for current plan display
+            if (isCurrentPlan) {
+                 buttonVariant = 'outline';
+            }
+            // --- End Adjusted Logic ---
 
             return (
               <Card
@@ -144,10 +169,10 @@ const PricingPage = () => {
                 </CardContent>
                 <CardFooter className="pt-6 border-t border-purple-500/20">
                   <Button 
-                    variant={isCurrentPlan ? 'outline' : plan.buttonVariant}
+                    variant={buttonVariant} // Use adjusted variant
                     className={`w-full transition-all duration-300 
                                ${isCurrentPlan ? 'bg-transparent border-purple-400 text-purple-300 cursor-default' : 
-                               plan.buttonVariant === 'outline' ? 'border-purple-400 text-purple-300 hover:bg-purple-500/10 hover:text-white' : 
+                               buttonVariant === 'outline' ? 'border-purple-400 text-purple-300 hover:bg-purple-500/10 hover:text-white' : 
                                'bg-purple-600 hover:bg-purple-700 text-white'} 
                                ${buttonDisabled && !isCurrentPlan ? 'opacity-50 cursor-not-allowed' : ''}`}
                     onClick={buttonAction}
@@ -159,7 +184,7 @@ const PricingPage = () => {
                     ) : isCurrentPlan ? (
                       'Current Plan'
                     ) : (
-                      plan.buttonText
+                      buttonText // Use adjusted button text
                     )}
                   </Button>
                 </CardFooter>

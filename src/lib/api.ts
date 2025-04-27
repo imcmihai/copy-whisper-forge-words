@@ -193,7 +193,7 @@ export const getCreditHistory = async (): Promise<CreditTransaction[]> => {
   }
 
   return data || []; // Return fetched data or an empty array if null/undefined
-};
+}; 
 
 // --- NEW: Function to get active chat count ---
 /**

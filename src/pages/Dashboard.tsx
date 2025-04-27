@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useUser } from '@/lib/hooks/useUser';
 import { AppSidebar } from '@/components/dashboard/AppSidebar';
 import { DashboardContent } from '@/components/dashboard/DashboardContent';
@@ -9,7 +9,16 @@ import { PanelLeft, AlertTriangle } from 'lucide-react';
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { user, subscription, isLoading, error } = useUser();
+  const { user, subscription, isLoading, error, mutate } = useUser();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    if (searchParams.get('success') === 'true') {
+      console.log("Stripe checkout success detected, refreshing user data...");
+      mutate();
+      setSearchParams({});
+    }
+  }, [searchParams, mutate, setSearchParams]);
 
   const DashboardLayout = () => {
     const { toggleSidebar } = useSidebar();

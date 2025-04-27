@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts' // Use a specific, stable version
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import Stripe from 'https://esm.sh/stripe@14.5.0?target=deno' // Use a specific, stable version compatible with Deno
+import Stripe from 'https://esm.sh/stripe@14.1.0?target=deno'
+
 
 // Initialize Stripe client with the secret key from environment variables
 // Ensure you have the correct types for Deno's environment variables

@@ -58,11 +58,11 @@ const ImageGenerator = ({ prompt: basePrompt, onImageGenerated, disabled = false
 
     // --- Credit Check (for paid tiers) ---
     if (tier !== 'free') {
-        const canAfford = await checkCredits(requiredCredits);
-        if (!canAfford) {
+    const canAfford = await checkCredits(requiredCredits);
+    if (!canAfford) {
           setError(`Not enough credits. Need ${requiredCredits}.`);
           toast({ title: "Insufficient Credits", description: `Image generation requires ${requiredCredits} credits.`, variant: "warning" });
-          return;
+      return;
         }
     }
 
@@ -83,15 +83,15 @@ const ImageGenerator = ({ prompt: basePrompt, onImageGenerated, disabled = false
       // --- Deduct Credits (Paid Tiers) OR Record Usage (Free Tier) ---
       if (tier !== 'free') {
           console.log(`[ImageGenerator] User tier is ${tier}. Deducting credits...`);
-          const creditsUsed = await deductCredits(
-            requiredCredits,
-            'image_generation',
+      const creditsUsed = await deductCredits(
+        requiredCredits,
+        'image_generation',
             { prompt: finalPrompt.substring(0, 100), highQuality }
-          );
-          if (!creditsUsed) {
+      );
+      if (!creditsUsed) {
               creditsSuccessfullyHandled = false;
-              console.warn("Image generated, but failed to deduct credits.");
-              setError("Image generated, but failed to update credits. Please contact support.");
+          console.warn("Image generated, but failed to deduct credits.");
+          setError("Image generated, but failed to update credits. Please contact support.");
               toast({ title: "Credit Error", description: "Image generated but credits may not have been deducted.", variant: "warning" });
           }
       } else {
@@ -109,14 +109,14 @@ const ImageGenerator = ({ prompt: basePrompt, onImageGenerated, disabled = false
               console.warn("[ImageGenerator] Usage recording FAILED (recordFeatureUsage returned false). Setting local state anyway.");
               setFreeGenerationDoneThisSession(true); 
               toast({ title: "Usage Recording Failed", description: "Image generated, but usage count might be incorrect.", variant: "warning" });
-          }
+      }
       }
       // --- End Credit/Usage Handling ---
 
       // Call the success callback only if credits/usage were handled (or decide if image should be shown anyway)
       if (creditsSuccessfullyHandled) { 
           setGeneratedImageUrl(imageUrl); // Set state to display the image
-          onImageGenerated(imageUrl);
+      onImageGenerated(imageUrl);
           toast({ title: "Image Generated!", description: "Your image is ready.", variant: "success" });
       }
 

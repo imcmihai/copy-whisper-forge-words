@@ -1,6 +1,6 @@
-import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import Stripe from 'https://esm.sh/stripe@14.5.0?target=deno'
+import { serve } from 'https://deno.land/std@1.0.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.4'
+import Stripe from 'https://esm.sh/stripe@14.1.0?target=deno'
 
 // Initialize Stripe client
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') ?? '', {
@@ -18,6 +18,7 @@ const corsHeaders = {
 }
 
 // Helper function to update user profile data
+// deno-lint-ignore no-explicit-any
 const updateUserSubscription = async (supabaseAdmin: any, userId: string, updates: Record<string, any>) => {
   const { error } = await supabaseAdmin
     .from('profiles') // Adjust table name if different
@@ -31,6 +32,7 @@ const updateUserSubscription = async (supabaseAdmin: any, userId: string, update
 }
 
 // Helper function to add a credit transaction
+// deno-lint-ignore no-explicit-any
 const addCreditTransaction = async (supabaseAdmin: any, userId: string, amount: number, type: string, description: string) => {
   const { error } = await supabaseAdmin
     .from('credit_transactions')
@@ -123,30 +125,68 @@ serve(async (req: Request) => {
         // Fetch corresponding plan details from your DB based on Stripe Price ID
         const { data: planData, error: planError } = await supabaseAdminClient
           .from('subscriptions')
-          .select('name, credits_per_month') // Fetch needed fields
-          .or(`stripe_price_id_monthly.eq.${priceId},stripe_price_id_yearly.eq.${priceId}`) // Match monthly or yearly ID
+          // Select fields needed for profile update and credit transaction
+          .select('name, credits_per_month')
+          // Use the correct column name for matching the price ID
+          .or(`stripe_price_id_monthly.eq.${priceId}`) // Check only monthly ID as yearly isn't used
           .single()
 
         if (planError || !planData) {
           console.error(`Plan data not found in DB for price ID ${priceId}:`, planError?.message);
-          // Don't update profile if plan details aren't found
-          break;
+          // Respond with an error so Stripe knows this ID wasn't found
+          return new Response(`Webhook Error: Plan data not found for price ID ${priceId}`, { status: 400 });
+          // break; // Replaced break with return to give Stripe feedback
         }
 
-        // Update user profile
-        const updates = {
+        // --- Safely handle dates ---
+        let startDateISO: string | null = null;
+        if (typeof subscription.current_period_start === 'number') {
+          try {
+            startDateISO = new Date(subscription.current_period_start * 1000).toISOString();
+          } catch (e) {
+            console.error(`Error converting start date timestamp ${subscription.current_period_start}:`, e);
+          }
+        } else {
+          console.warn(`Received invalid subscription.current_period_start: ${subscription.current_period_start}`);
+        }
+
+        let endDateISO: string | null = null;
+        if (typeof subscription.current_period_end === 'number') {
+           try {
+             endDateISO = new Date(subscription.current_period_end * 1000).toISOString();
+           } catch(e) {
+             console.error(`Error converting end date timestamp ${subscription.current_period_end}:`, e);
+           }
+        } else {
+          console.warn(`Received invalid subscription.current_period_end: ${subscription.current_period_end}`);
+        }
+        // --- End Date Handling ---
+
+        // Update user profile using the helper function and validated dates
+        // Construct the base updates object
+        // deno-lint-ignore no-explicit-any
+        const updates: Record<string, any> = {
           subscription_tier: planData.name.toLowerCase(),
           credits_remaining: planData.credits_per_month, // Reset credits on new/updated subscription
           credits_total: planData.credits_per_month,
-          subscription_start_date: new Date(subscription.current_period_start * 1000).toISOString(),
-          subscription_end_date: new Date(subscription.current_period_end * 1000).toISOString(),
           stripe_subscription_id: subscription.id,
+          // Ensure stripe_customer_id is handled correctly based on its type
           stripe_customer_id: typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id
+        };
+
+        // Conditionally add dates only if they are valid
+        if (startDateISO) {
+          updates.subscription_start_date = startDateISO;
         }
+        if (endDateISO) {
+          updates.subscription_end_date = endDateISO;
+        }
+
+        // Call the helper function which updates the 'profiles' table
         await updateUserSubscription(supabaseAdminClient, userId, updates);
         console.log(`Updated profile for user ${userId} to ${planData.name} tier.`);
 
-        // Add a credit transaction for the renewal/creation
+        // Add a credit transaction for the renewal/creation using the helper function
         await addCreditTransaction(
           supabaseAdminClient,
           userId,
@@ -168,6 +208,7 @@ serve(async (req: Request) => {
         }
 
         // Fetch details for the default 'free' plan (assuming it exists with name 'Free')
+        // deno-lint-ignore no-unused-vars
         const { data: freePlanData, error: freePlanError } = await supabaseAdminClient
           .from('subscriptions')
           .select('credits_per_month')

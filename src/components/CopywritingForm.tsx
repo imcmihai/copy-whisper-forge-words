@@ -79,17 +79,17 @@ export const CopywritingForm: React.FC<CopywritingFormProps> = () => {
     try {
       // --- Credit Check (Applies to paid tiers primarily now) ---
       if (tier !== 'free') { // Only check credits for non-free users
-          const hasEnoughCredits = await checkCredits(requiredCredits);
-          if (!hasEnoughCredits) {
-            toast({
-              title: 'Not enough credits',
-              description: `This generation requires ${requiredCredits} credits. Please upgrade or wait for renewal.`,
-              variant: 'destructive',
-            });
-            return; // Stop submission if not enough credits
-          }
+      const hasEnoughCredits = await checkCredits(requiredCredits);
+      if (!hasEnoughCredits) {
+        toast({
+          title: 'Not enough credits',
+          description: `This generation requires ${requiredCredits} credits. Please upgrade or wait for renewal.`,
+          variant: 'destructive',
+        });
+        return; // Stop submission if not enough credits
       }
-      
+      }
+
       // --- Call Generation (Pass model to fix linter error) ---
       const payload: GenerateCopywritingPayload = { ...input, model };
       console.log('Submitting form with payload:', payload);
@@ -98,14 +98,14 @@ export const CopywritingForm: React.FC<CopywritingFormProps> = () => {
 
       // --- Deduct Credits (Only for non-free tiers) ---
       if (tier !== 'free') {
-          const creditsWereUsed = await deductCredits(
-              requiredCredits, 
-              'text_generation', 
-              { textLength: input.textLength, model } // Include model in metadata
-          );
-          
-          if (!creditsWereUsed) {
-              console.warn("Generation succeeded, but credit deduction failed post-operation.");
+      const creditsWereUsed = await deductCredits(
+          requiredCredits, 
+          'text_generation', 
+          { textLength: input.textLength, model } // Include model in metadata
+      );
+      
+      if (!creditsWereUsed) {
+          console.warn("Generation succeeded, but credit deduction failed post-operation.");
               // Optional: Show a warning toast
           }
       }

@@ -1,0 +1,55 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Debugging Plan: Subscription Payment Processing Error
+Issue Summary
+
+
+After users complete Stripe payment for subscription upgrades, Supabase logs show a Deno runtime error preventing access to paid features:
+
+####For every stage of this debugging process, I need you to dive deeply into each problem, think about the best solutions, and provide accurate fixes
+
+Error: Deno.core.runMicrotasks() is not supported in this environment
+Debugging Approach
+
+##1. Payment Flow Analysis
+Map the complete user journey from subscription selection to feature access
+Identify where the error occurs in this sequence
+Review Stripe webhook configuration and event handling
+##2. Environment Compatibility Check
+Examine any code using Node.js APIs in Deno environment (likely in Edge Functions)
+Check for inappropriate mixing of Node and Deno runtime features
+Review the event handling mechanism around page unload events
+##3. Error Reproduction
+Create controlled test cases that consistently trigger the error
+Add detailed logging before/after critical steps in payment processing
+Capture complete request/response data during Stripe interactions
+##4. Database Verification
+Confirm if subscription data is properly stored despite the error
+Check for database triggers or functions that might contribute to the issue
+Verify user permission updates post-payment
+##5. Solution Implementation
+Replace incompatible Node.js APIs with Deno-compatible alternatives
+Consider moving webhook processing to appropriate environment
+Implement proper error handling with fallback mechanisms
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

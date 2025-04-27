@@ -23,6 +23,40 @@ The implementation consists of four main components:
 3. Feature Gating - Controlling access to features based on subscription tier
 4. New Features - Adding image generation, model selection, and export options
 
+
+##New Features(image generation, LLM model selection, export options)
+
+Image generation and Export Options components will be present inside the /generated-copy page, on the right side of the screen. For mobile users, these components will be accessed via representative icons in the top left corner of the chat.
+
+Image generation will use DALLE-3 API.
+
+LLM model selection will be used ONLY in the /copywriting-form page.
+Free users will only have access to ChatGPT-4o-mini
+Basic users will have acces to ChatGPT-4o-mini, ChatGPT-4o and Chat GPT-4.1-mini
+Pro Users will have access to ChatGPT-4o-mini, ChatGPT-4o, ChatGPT-4.1-mini and ChatGPT-4.1
+
+##Credit system
+For every generated text, 20 credits will be deducted from the users credit balance
+For every message sent in the chat, 5 credits will be deducted from the users credit balance
+For every image generation, 120 credits will be deducted from the users credit balance
+
+
+##Subscription credit allowance 
+Free plan: 200 credits
+Basic plan: 2000 credits
+Pro plan: 6000 credits
+
+
+##Credits tracker UI component
+Users will be able to see their remaining credits in the /dashboard page.
+
+
+
+##Subscriptions
+Make sure that the subscription payments work flawlessly, without any log errors in the Supabase Edge Functions or in Stripe Webhooks.
+Users must have the option to unsubscribe from their current plan.
+The subscription plans will be displayed in a /pricing page, which will be accesible via the /dashboard page
+
 ------------
 
 ###Folder structure
@@ -64,29 +98,28 @@ The implementation consists of four main components:
 
 ------------
 
-##1. Database Schema Updates
-First, update the Supabase database schema to support subscriptions and credits:
-##The following code is an example. Provide me with the actual code that fits my codebase. Provide guidance.##
+Subscription Payments System Architecture
+Database Schema
+sql
+Copy SQL
 -- Users table updates
 ALTER TABLE users ADD COLUMN subscription_tier VARCHAR(20) DEFAULT 'free';
-ALTER TABLE users ADD COLUMN credits_remaining INTEGER DEFAULT 100;
-ALTER TABLE users ADD COLUMN credits_total INTEGER DEFAULT 100;
+ALTER TABLE users ADD COLUMN credits_remaining INTEGER DEFAULT 200;
+ALTER TABLE users ADD COLUMN credits_total INTEGER DEFAULT 200;
 ALTER TABLE users ADD COLUMN subscription_start_date TIMESTAMP;
 ALTER TABLE users ADD COLUMN subscription_end_date TIMESTAMP;
 ALTER TABLE users ADD COLUMN stripe_customer_id VARCHAR(255);
 ALTER TABLE users ADD COLUMN stripe_subscription_id VARCHAR(255);
+ALTER TABLE users ADD COLUMN can_cancel BOOLEAN DEFAULT true;
 
 -- Create subscriptions table
 CREATE TABLE subscriptions (
   id SERIAL PRIMARY KEY,
   name VARCHAR(50) NOT NULL,
   price_monthly DECIMAL(10,2) NOT NULL,
-  price_yearly DECIMAL(10,2) NOT NULL,
   credits_per_month INTEGER NOT NULL,
-  max_chats INTEGER,
   features JSONB,
   stripe_price_id_monthly VARCHAR(255),
-  stripe_price_id_yearly VARCHAR(255),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -109,131 +142,145 @@ CREATE TABLE feature_usage (
   metadata JSONB,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+System Components Interaction
+The subscription system consists of these interconnected components:
 
+Client-side Components
+Pricing page
+Subscription management UI
+Credit display
+Feature access controls
+Server-side Components
+Supabase Edge Functions
+Stripe webhook handlers
+Database functions
+External Services
+Stripe API
+Data Flow Diagram
+User → Pricing Page → Checkout Session → Stripe Payment → Webhook → Database Update → Feature Access
+Detailed Implementation
+1. Stripe Product Configuration
+Set up Stripe products and prices with proper metadata:
 
-
--------------
-
-##2. Stripe Setup
-
-For each step, give me detailed instructions.
-
-Set up Stripe products and prices:
-•	1. Create a Stripe account if you don't have one
-•	2. Install Stripe libraries: npm install @stripe/stripe-js @stripe/react-stripe-js stripe
-•	3. Set up Stripe products and prices in the Stripe dashboard or via API
-•	4. Configure webhook endpoints for handling subscription events
-
-##The following code is an example. Provide me with the actual code that fits my codebase and project structure. Provide guidance.##
-
-Stripe Product Setup Code
-// Example code for setting up Stripe products and prices via API
+javascript
+Copy Code
+// src/lib/stripe-setup.js
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 async function setupStripeProducts() {
-  // Create Basic product
+  // Basic Plan
   const basicProduct = await stripe.products.create({
     name: 'Basic Plan',
     description: '2,000 credits/month, unlimited chats, ChatGPT-4o access',
+    metadata: {
+      tier: 'basic',
+      credits: '2000'
+    }
   });
 
-  // Create Basic price (monthly)
   await stripe.prices.create({
     product: basicProduct.id,
     unit_amount: 999, // $9.99
     currency: 'usd',
-    recurring: {
-      interval: 'month',
-    },
-    metadata: {
-      tier: 'basic',
-      credits: '2000',
-    },
+    recurring: { interval: 'month' },
+    metadata: { tier: 'basic' }
   });
 
-  // Create Pro product
+  // Pro Plan
   const proProduct = await stripe.products.create({
     name: 'Pro Plan',
     description: '6,000 credits/month, advanced AI models, all export options',
+    metadata: {
+      tier: 'pro',
+      credits: '6000'
+    }
   });
 
-  // Create Pro price (monthly)
   await stripe.prices.create({
     product: proProduct.id,
     unit_amount: 2499, // $24.99
     currency: 'usd',
-    recurring: {
-      interval: 'month',
-    },
-    metadata: {
-      tier: 'pro',
-      credits: '6000',
-    },
+    recurring: { interval: 'month' },
+    metadata: { tier: 'pro' }
   });
 }
-
-
-
-
-
-##3. Supabase Edge Functions for Stripe
-Create Supabase Edge Functions to handle Stripe interactions securely:
-##The following code is an example. Provide me with the actual code that fits my codebase and project structure. Provide guidance.##
-
+2. Supabase Edge Functions
+Create Checkout Session
+typescript
+Copy Code
 // supabase/functions/create-checkout-session/index.ts
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import Stripe from 'https://esm.sh/stripe@11.1.0?target=deno'
+import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import Stripe from 'https://esm.sh/stripe@11.1.0?target=deno';
 
+// Important: Use fetch-based HTTP client to avoid event loop errors
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') as string, {
-  httpClient: Stripe.createFetchHttpClient(),
-})
+  httpClient: Stripe.createFetchHttpClient()
+});
 
 serve(async (req) => {
   // Handle CORS
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    }})
+    return new Response('ok', { 
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+      }
+    });
   }
 
   try {
-    const { priceId, userId, returnUrl } = await req.json()
+    const { priceId, userId, returnUrl } = await req.json();
 
-    // Create Supabase client
+    // Check if user already has an active subscription
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') as string,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string
-    )
+    );
 
-    // Get user data
     const { data: userData, error: userError } = await supabaseClient
       .from('users')
-      .select('stripe_customer_id, email')
+      .select('stripe_customer_id, subscription_tier, subscription_end_date')
       .eq('id', userId)
-      .single()
+      .single();
 
-    if (userError) throw userError
+    if (userError) throw userError;
+
+    // Prevent subscribing to a new plan if already subscribed
+    const currentDate = new Date();
+    if (
+      userData.subscription_tier !== 'free' && 
+      userData.subscription_end_date && 
+      new Date(userData.subscription_end_date) > currentDate
+    ) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'You already have an active subscription. Please wait until it expires or cancel it before subscribing to a new plan.' 
+        }), 
+        { 
+          status: 400,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+    }
 
     // Get or create Stripe customer
-    let customerId = userData.stripe_customer_id
+    let customerId = userData.stripe_customer_id;
     if (!customerId) {
-      const { data: user } = await supabaseClient.auth.admin.getUserById(userId)
-
+      const { data: user } = await supabaseClient.auth.admin.getUserById(userId);
+      
       const customer = await stripe.customers.create({
         email: user.user.email,
-        metadata: { userId },
-      })
-
-      customerId = customer.id
-
-      // Save Stripe customer ID
+        metadata: { userId }
+      });
+      
+      customerId = customer.id;
+      
       await supabaseClient
         .from('users')
         .update({ stripe_customer_id: customerId })
-        .eq('id', userId)
+        .eq('id', userId);
     }
 
     // Create checkout session
@@ -244,400 +291,214 @@ serve(async (req) => {
       success_url: `${returnUrl}?success=true`,
       cancel_url: `${returnUrl}?canceled=true`,
       subscription_data: {
-        metadata: { userId },
-      },
-    })
+        metadata: { userId }
+      }
+    });
 
-    return new Response(JSON.stringify({ url: session.url }), {
-      headers: { 'Content-Type': 'application/json' },
-    })
+    return new Response(
+      JSON.stringify({ url: session.url }), 
+      { headers: { 'Content-Type': 'application/json' } }
+    );
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    return new Response(
+      JSON.stringify({ error: error.message }), 
+      { 
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
   }
-})
-##4. Stripe Webhook Handler
+});
+Cancel Subscription
+typescript
+Copy Code
+// supabase/functions/cancel-subscription/index.ts
+import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import Stripe from 'https://esm.sh/stripe@11.1.0?target=deno';
 
-Create a webhook handler to process Stripe events:
-
-##The following code is an example. Provide me with the actual code that fits my codebase and project structure. Provide guidance.##
-
-// supabase/functions/stripe-webhook/index.ts
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import Stripe from 'https://esm.sh/stripe@11.1.0?target=deno'
-
+// Important: Use fetch-based HTTP client to avoid event loop errors
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') as string, {
-  httpClient: Stripe.createFetchHttpClient(),
-})
-const endpointSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET') as string
+  httpClient: Stripe.createFetchHttpClient()
+});
 
 serve(async (req) => {
-  const signature = req.headers.get('stripe-signature')
-  if (!signature) {
-    return new Response('Missing stripe-signature header', { status: 400 })
+  // Handle CORS
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { 
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+      }
+    });
   }
 
-  const body = await req.text()
-  let event
+  try {
+    const { userId } = await req.json();
+
+    // Create Supabase client
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') as string,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string
+    );
+
+    // Get user's subscription
+    const { data: userData, error: userError } = await supabaseClient
+      .from('users')
+      .select('stripe_subscription_id')
+      .eq('id', userId)
+      .single();
+
+    if (userError) throw userError;
+    if (!userData.stripe_subscription_id) {
+      throw new Error('No active subscription found');
+    }
+
+    // Cancel subscription at period end
+    await stripe.subscriptions.update(userData.stripe_subscription_id, {
+      cancel_at_period_end: true
+    });
+
+    // Update user record
+    await supabaseClient
+      .from('users')
+      .update({ can_cancel: false })
+      .eq('id', userId);
+
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        message: 'Subscription will be canceled at the end of the billing period' 
+      }), 
+      { headers: { 'Content-Type': 'application/json' } }
+    );
+  } catch (error) {
+    return new Response(
+      JSON.stringify({ error: error.message }), 
+      { 
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
+  }
+});
+Stripe Webhook Handler
+typescript
+Copy Code
+// supabase/functions/stripe-webhook/index.ts
+import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import Stripe from 'https://esm.sh/stripe@11.1.0?target=deno';
+
+// Important: Use fetch-based HTTP client to avoid event loop errors
+const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') as string, {
+  httpClient: Stripe.createFetchHttpClient()
+});
+
+const endpointSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET') as string;
+
+serve(async (req) => {
+  const signature = req.headers.get('stripe-signature');
+  if (!signature) {
+    return new Response('Missing stripe-signature header', { status: 400 });
+  }
+
+  const body = await req.text();
+  let event;
 
   try {
-    event = stripe.webhooks.constructEvent(body, signature, endpointSecret)
+    event = stripe.webhooks.constructEvent(body, signature, endpointSecret);
   } catch (err) {
-    return new Response(`Webhook Error: ${err.message}`, { status: 400 })
+    return new Response(`Webhook Error: ${err.message}`, { status: 400 });
   }
 
   // Create Supabase client
   const supabaseClient = createClient(
     Deno.env.get('SUPABASE_URL') as string,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string
-  )
+  );
 
   // Handle the event
-  switch (event.type) {
-    case 'customer.subscription.created':
-    case 'customer.subscription.updated': {
-      const subscription = event.data.object
-      const userId = subscription.metadata.userId
-
-      // Get subscription details
-      const { data: priceData } = await supabaseClient
-        .from('subscriptions')
-        .select('name, credits_per_month')
-        .eq('stripe_price_id_monthly', subscription.items.data[0].price.id)
-        .single()
-
-      if (!priceData) break
-
-      // Update user subscription
-      await supabaseClient
-        .from('users')
-        .update({
-          subscription_tier: priceData.name.toLowerCase(),
-          credits_remaining: priceData.credits_per_month,
-          credits_total: priceData.credits_per_month,
-          subscription_start_date: new Date(subscription.current_period_start * 1000).toISOString(),
-          subscription_end_date: new Date(subscription.current_period_end * 1000).toISOString(),
-          stripe_subscription_id: subscription.id
-        })
-        .eq('id', userId)
-
-      // Record credit transaction
-      await supabaseClient
-        .from('credit_transactions')
-        .insert({
-          user_id: userId,
-          amount: priceData.credits_per_month,
-          transaction_type: 'subscription_renewal',
-          description: `Credits from ${priceData.name} subscription`
-        })
-
-      break
-    }
-    case 'customer.subscription.deleted': {
-      const subscription = event.data.object
-      const userId = subscription.metadata.userId
-
-      // Update user to free tier
-      await supabaseClient
-        .from('users')
-        .update({
-          subscription_tier: 'free',
-          credits_remaining: 100,
-          credits_total: 100,
-          stripe_subscription_id: null
-        })
-        .eq('id', userId)
-
-      break
-    }
-  }
-
-  return new Response(JSON.stringify({ received: true }), {
-    headers: { 'Content-Type': 'application/json' },
-  })
-})
-
-##5. Frontend Components
-Create React components for the subscription system:
-##The following code is an example. Provide me with the actual code that fits my codebase and project structure. Provide guidance.##
-
-Pricing Page Component
-// components/PricingPage.tsx
-import React from 'react';
-import { useUser } from '@/lib/hooks/useUser';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckIcon } from 'lucide-react';
-import { createCheckoutSession } from '@/lib/api';
-
-const PricingPage = () => {
-  const { user, subscription } = useUser();
-
-  const handleSubscribe = async (priceId: string) => {
-    if (!user) {
-      // Redirect to sign in
-      return;
-    }
-
-    try {
-      const { url } = await createCheckoutSession({
-        priceId,
-        userId: user.id,
-        returnUrl: window.location.origin + '/dashboard',
-      });
-
-      window.location.href = url;
-    } catch (error) {
-      console.error('Error creating checkout session:', error);
-    }
-  };
-
-  return (
-    <div className="container mx-auto py-10">
-      <h1 className="text-3xl font-bold text-center mb-10">Choose Your Plan</h1>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {/* Free Plan */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Free</CardTitle>
-            <CardDescription>For occasional use</CardDescription>
-            <div className="mt-4 text-3xl font-bold">$0</div>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2">
-              <li className="flex items-center">
-                <CheckIcon className="h-5 w-5 mr-2 text-green-500" />
-                <span>100 credits per month</span>
-              </li>
-              <li className="flex items-center">
-                <CheckIcon className="h-5 w-5 mr-2 text-green-500" />
-                <span>3 active chats maximum</span>
-              </li>
-              <li className="flex items-center">
-                <CheckIcon className="h-5 w-5 mr-2 text-green-500" />
-                <span>ChatGPT-4o-mini only</span>
-              </li>
-              <li className="flex items-center">
-                <CheckIcon className="h-5 w-5 mr-2 text-green-500" />
-                <span>2 regenerations per copy</span>
-              </li>
-              <li className="flex items-center">
-                <CheckIcon className="h-5 w-5 mr-2 text-green-500" />
-                <span>Plain text export only</span>
-              </li>
-            </ul>
-          </CardContent>
-          <CardFooter>
-            <Button 
-              variant="outline" 
-              className="w-full"
-              disabled={subscription?.tier === 'free'}
-            >
-              {subscription?.tier === 'free' ? 'Current Plan' : 'Get Started'}
-            </Button>
-          </CardFooter>
-        </Card>
-
-        {/* Basic Plan */}
-        <Card className="border-primary">
-          <CardHeader>
-            <CardTitle>Basic</CardTitle>
-            <CardDescription>For regular content creators</CardDescription>
-            <div className="mt-4 text-3xl font-bold">$9.99<span className="text-sm font-normal">/month</span></div>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2">
-              <li className="flex items-center">
-                <CheckIcon className="h-5 w-5 mr-2 text-green-500" />
-                <span>2,000 credits per month</span>
-              </li>
-              <li className="flex items-center">
-                <CheckIcon className="h-5 w-5 mr-2 text-green-500" />
-                <span>Unlimited chats</span>
-              </li>
-              <li className="flex items-center">
-                <CheckIcon className="h-5 w-5 mr-2 text-green-500" />
-                <span>ChatGPT-4o access</span>
-              </li>
-              <li className="flex items-center">
-                <CheckIcon className="h-5 w-5 mr-2 text-green-500" />
-                <span>Basic image generation</span>
-              </li>
-              <li className="flex items-center">
-                <CheckIcon className="h-5 w-5 mr-2 text-green-500" />
-                <span>Unlimited regenerations</span>
-              </li>
-              <li className="flex items-center">
-                <CheckIcon className="h-5 w-5 mr-2 text-green-500" />
-                <span>Plain text & Markdown export</span>
-              </li>
-            </ul>
-          </CardContent>
-          <CardFooter>
-            <Button 
-              className="w-full"
-              onClick={() => handleSubscribe('price_basic_monthly_id')}
-              disabled={subscription?.tier === 'basic'}
-            >
-              {subscription?.tier === 'basic' ? 'Current Plan' : 'Subscribe'}
-            </Button>
-          </CardFooter>
-        </Card>
-
-        {/* Pro Plan */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Pro</CardTitle>
-            <CardDescription>For power users</CardDescription>
-            <div className="mt-4 text-3xl font-bold">$24.99<span className="text-sm font-normal">/month</span></div>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2">
-              <li className="flex items-center">
-                <CheckIcon className="h-5 w-5 mr-2 text-green-500" />
-                <span>6,000 credits per month</span>
-              </li>
-              <li className="flex items-center">
-                <CheckIcon className="h-5 w-5 mr-2 text-green-500" />
-                <span>Everything in Basic</span>
-              </li>
-              <li className="flex items-center">
-                <CheckIcon className="h-5 w-5 mr-2 text-green-500" />
-                <span>Access to ChatGPT-4.1</span>
-              </li>
-              <li className="flex items-center">
-                <CheckIcon className="h-5 w-5 mr-2 text-green-500" />
-                <span>High-quality image generation</span>
-              </li>
-              <li className="flex items-center">
-                <CheckIcon className="h-5 w-5 mr-2 text-green-500" />
-                <span>All export formats</span>
-              </li>
-            </ul>
-          </CardContent>
-          <CardFooter>
-            <Button 
-              className="w-full"
-              onClick={() => handleSubscribe('price_pro_monthly_id')}
-              disabled={subscription?.tier === 'pro'}
-            >
-              {subscription?.tier === 'pro' ? 'Current Plan' : 'Subscribe'}
-            </Button>
-          </CardFooter>
-        </Card>
-      </div>
-    </div>
-  );
-};
-
-export default PricingPage;
-Credit Display Component
-// components/CreditDisplay.tsx
-import React from 'react';
-import { Progress } from '@/components/ui/progress';
-import { useUser } from '@/lib/hooks/useUser';
-
-const CreditDisplay = () => {
-  const { subscription } = useUser();
-
-  if (!subscription) return null;
-
-  const { creditsRemaining, creditsTotal } = subscription;
-  const percentage = Math.round((creditsRemaining / creditsTotal) * 100);
-
-  return (
-    <div className="p-4 border rounded-lg">
-      <div className="flex justify-between items-center mb-2">
-        <h3 className="font-medium">Credits Remaining</h3>
-        <span className="text-sm">{creditsRemaining} / {creditsTotal}</span>
-      </div>
-      <Progress value={percentage} className="h-2" />
-      {percentage < 20 && (
-        <p className="text-sm text-red-500 mt-2">
-          You're running low on credits! Consider upgrading your plan.
-        </p>
-      )}
-    </div>
-  );
-};
-
-export default CreditDisplay;
-
-##6. Credit System Implementation
-Implement the credit tracking and management system:
-##The following code is an example. Provide me with the actual code that fits my codebase and project structure. Provide guidance.##
-
-// lib/hooks/useCredits.ts
-import { useState } from 'react';
-import { useUser } from './useUser';
-import { supabase } from '@/lib/supabase';
-
-export const useCredits = () => {
-  const { user, subscription, mutate } = useUser();
-  const [isChecking, setIsChecking] = useState(false);
-
-  const checkCredits = async (requiredCredits: number) => {
-    if (!user || !subscription) return false;
-
-    setIsChecking(true);
-
-    try {
-      const { creditsRemaining } = subscription;
-
-      if (creditsRemaining < requiredCredits) {
-        return false;
+  try {
+    switch (event.type) {
+      case 'customer.subscription.created':
+      case 'customer.subscription.updated': {
+        const subscription = event.data.object;
+        const userId = subscription.metadata.userId;
+        
+        // Get subscription details from Stripe
+        const stripeSubscription = await stripe.subscriptions.retrieve(
+          subscription.id,
+          { expand: ['items.data.price.product'] }
+        );
+        
+        const product = stripeSubscription.items.data[0].price.product;
+        const tierName = product.metadata.tier || 'basic';
+        const creditsPerMonth = parseInt(product.metadata.credits || '2000');
+        
+        // Update user subscription
+        await supabaseClient
+          .from('users')
+          .update({
+            subscription_tier: tierName,
+            credits_remaining: creditsPerMonth,
+            credits_total: creditsPerMonth,
+            subscription_start_date: new Date(subscription.current_period_start * 1000).toISOString(),
+            subscription_end_date: new Date(subscription.current_period_end * 1000).toISOString(),
+            stripe_subscription_id: subscription.id,
+            can_cancel: true
+          })
+          .eq('id', userId);
+        
+        // Record credit transaction
+        await supabaseClient
+          .from('credit_transactions')
+          .insert({
+            user_id: userId,
+            amount: creditsPerMonth,
+            transaction_type: 'subscription_renewal',
+            description: `Credits from ${tierName} subscription`
+          });
+        
+        break;
       }
-
-      return true;
-    } catch (error) {
-      console.error('Error checking credits:', error);
-      return false;
-    } finally {
-      setIsChecking(false);
+      
+      case 'customer.subscription.deleted': {
+        const subscription = event.data.object;
+        const userId = subscription.metadata.userId;
+        
+        // Update user to free tier
+        await supabaseClient
+          .from('users')
+          .update({
+            subscription_tier: 'free',
+            credits_remaining: 200,
+            credits_total: 200,
+            stripe_subscription_id: null,
+            can_cancel: true
+          })
+          .eq('id', userId);
+        
+        break;
+      }
     }
-  };
-
-  const useCredits = async (amount: number, featureType: string, metadata = {}) => {
-    if (!user || !subscription) return false;
-
-    try {
-      // Check if user has enough credits
-      const hasEnough = await checkCredits(amount);
-      if (!hasEnough) return false;
-
-      // Deduct credits
-      const { data, error } = await supabase.rpc('use_credits', {
-        p_user_id: user.id,
-        p_amount: amount,
-        p_feature_type: featureType,
-        p_metadata: metadata
-      });
-
-      if (error) throw error;
-
-      // Update local subscription data
-      mutate();
-
-      return true;
-    } catch (error) {
-      console.error('Error using credits:', error);
-      return false;
-    }
-  };
-
-  return {
-    checkCredits,
-    useCredits,
-    isChecking,
-  };
-};
+    
+    return new Response(JSON.stringify({ received: true }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (error) {
+    console.error('Error processing webhook:', error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+});
+3. Credit System Implementation
 Database Function for Credit Usage
-##The following code is an example. Provide me with the actual code that fits my codebase and project structure. Provide guidance.##
-
+sql
+Copy SQL
 -- Create a function to use credits
 CREATE OR REPLACE FUNCTION use_credits(
   p_user_id UUID,
@@ -696,1070 +557,184 @@ BEGIN
   RETURN TRUE;
 END;
 $$;
-7. Feature Gating Implementation
-##The following code is an example. Provide me with the actual code that fits my codebase and project structure. Provide guidance.##
-
-Implement feature access control based on subscription tier:
-// lib/hooks/useFeatureAccess.ts
-import { useUser } from './useUser';
-
-type Feature = 
-  | 'unlimited_chats'
-  | 'image_generation'
-  | 'high_quality_images'
-  | 'advanced_models'
-  | 'unlimited_regenerations'
-  | 'markdown_export'
-  | 'all_exports';
-
-const featureMatrix: Record<string, Feature[]> = {
-  free: [],
-  basic: [
-    'unlimited_chats',
-    'image_generation',
-    'unlimited_regenerations',
-    'markdown_export'
-  ],
-  pro: [
-    'unlimited_chats',
-    'image_generation',
-    'high_quality_images',
-    'advanced_models',
-    'unlimited_regenerations',
-    'markdown_export',
-    'all_exports'
-  ]
-};
-
-export const useFeatureAccess = () => {
-  const { subscription } = useUser();
-  const tier = subscription?.tier || 'free';
-
-  const hasAccess = (feature: Feature) => {
-    return featureMatrix[tier].includes(feature);
-  };
-
-  const getAvailableModels = () => {
-    if (tier === 'pro') {
-      return ['gpt-4o-mini', 'gpt-4o', 'gpt-4.1'];
-    }
-    if (tier === 'basic') {
-      return ['gpt-4o-mini', 'gpt-4o'];
-    }
-    return ['gpt-4o-mini'];
-  };
-
-  const getMaxChats = () => {
-    if (tier === 'free') return 3;
-    return Infinity;
-  };
-
-  const getMaxRegenerations = () => {
-    if (tier === 'free') return 2;
-    return Infinity;
-  };
-
-  return {
-    hasAccess,
-    getAvailableModels,
-    getMaxChats,
-    getMaxRegenerations,
-  };
-};
-8. New Features Implementation
-##The following code is an example. Provide me with the actual code that fits my codebase and project structure. Provide guidance.##
-
-Implement the new features required for the subscription tiers:
-Model Selector Component
-// components/ModelSelector.tsx
-import React from 'react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useFeatureAccess } from '@/lib/hooks/useFeatureAccess';
-
-interface ModelSelectorProps {
-  value: string;
-  onChange: (value: string) => void;
-}
-
-const ModelSelector = ({ value, onChange }: ModelSelectorProps) => {
-  const { getAvailableModels } = useFeatureAccess();
-  const availableModels = getAvailableModels();
-
-  return (
-    <div className="space-y-2">
-      <label className="text-sm font-medium">AI Model</label>
-      <Select value={value} onValueChange={onChange}>
-        <SelectTrigger>
-          <SelectValue placeholder="Select model" />
-        </SelectTrigger>
-        <SelectContent>
-          {availableModels.map((model) => (
-            <SelectItem key={model} value={model}>
-              {model === 'gpt-4o-mini' && 'GPT-4o Mini'}
-              {model === 'gpt-4o' && 'GPT-4o'}
-              {model === 'gpt-4.1' && 'GPT-4.1 (Pro)'}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
-};
-
-export default ModelSelector;
-Image Generation Component
-##The following code is an example. Provide me with the actual code that fits my codebase and project structure. Provide guidance.##
-
-// components/ImageGenerator.tsx
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Loader2, ImageIcon } from 'lucide-react';
-import { useFeatureAccess } from '@/lib/hooks/useFeatureAccess';
-import { useCredits } from '@/lib/hooks/useCredits';
-import { generateImage } from '@/lib/api';
-
-interface ImageGeneratorProps {
-  prompt: string;
-  onImageGenerated: (imageUrl: string) => void;
-}
-
-const ImageGenerator = ({ prompt, onImageGenerated }: ImageGeneratorProps) => {
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const { hasAccess } = useFeatureAccess();
-  const { useCredits, checkCredits } = useCredits();
-
-  const hasImageAccess = hasAccess('image_generation');
-  const hasHighQualityAccess = hasAccess('high_quality_images');
-
-  const handleGenerateImage = async (highQuality: boolean) => {
-    setError(null);
-
-    // Check credits
-    const requiredCredits = highQuality ? 100 : 50;
-    const hasEnoughCredits = await checkCredits(requiredCredits);
-
-    if (!hasEnoughCredits) {
-      setError('Not enough credits to generate an image');
-      return;
-    }
-
-    setIsGenerating(true);
-
-    try {
-      // Generate image
-      const { imageUrl } = await generateImage({
-        prompt,
-        highQuality,
-      });
-
-      // Use credits
-      await useCredits(
-        requiredCredits,
-        'image_generation',
-        { prompt, highQuality }
-      );
-
-      onImageGenerated(imageUrl);
-    } catch (err) {
-      setError('Failed to generate image. Please try again.');
-      console.error(err);
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  if (!hasImageAccess) return null;
-
-  return (
-    <div className="space-y-2 p-4 border rounded-lg">
-      <h3 className="font-medium">Generate Image</h3>
-      <p className="text-sm text-gray-500">
-        Generate an image based on your text. Uses {hasHighQualityAccess ? '50-100' : '50'} credits.
-      </p>
-
-      <div className="flex gap-2">
-        <Button
-          variant="outline"
-          onClick={() => handleGenerateImage(false)}
-          disabled={isGenerating}
-        >
-          {isGenerating ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Generating...
-            </>
-          ) : (
-            <>
-              <ImageIcon className="mr-2 h-4 w-4" />
-              Generate Image
-            </>
-          )}
-        </Button>
-
-        {hasHighQualityAccess && (
-          <Button
-            onClick={() => handleGenerateImage(true)}
-            disabled={isGenerating}
-          >
-            High Quality
-          </Button>
-        )}
-      </div>
-
-      {error && <p className="text-sm text-red-500">{error}</p>}
-    </div>
-  );
-};
-
-export default ImageGenerator;
-Export Options Component
-##The following code is an example. Provide me with the actual code that fits my codebase and project structure. Provide guidance.##
-
-// components/ExportOptions.tsx
-import React from 'react';
-import { Button } from '@/components/ui/button';
-import { DownloadIcon, FileTextIcon, MarkdownIcon, CodeIcon } from 'lucide-react';
-import { useFeatureAccess } from '@/lib/hooks/useFeatureAccess';
-
-interface ExportOptionsProps {
-  content: string;
-  images: string[];
-}
-
-const ExportOptions = ({ content, images }: ExportOptionsProps) => {
-  const { hasAccess } = useFeatureAccess();
-
-  const hasMarkdownAccess = hasAccess('markdown_export');
-  const hasAllExportsAccess = hasAccess('all_exports');
-
-  const exportPlainText = () => {
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'copy-text.txt';
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const exportMarkdown = () => {
-    if (!hasMarkdownAccess) return;
-
-    const markdownContent = content;
-    const blob = new Blob([markdownContent], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'copy-text.md';
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const exportHTML = () => {
-    if (!hasAllExportsAccess) return;
-
-    const htmlContent = `<!DOCTYPE html>
-<html>
-<head>
-  <title>Exported Copy</title>
-  <style>
-    body { font-family: Arial, sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px; }
-    img { max-width: 100%; height: auto; margin: 20px 0; }
-  </style>
-</head>
-<body>
-  <div>${content.replace(/\n/g, '<br>')}</div>
-  ${images.map(img => `<img src="${img}" alt="Generated image" />`).join('')}
-</body>
-</html>`;
-
-    const blob = new Blob([htmlContent], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'copy-text.html';
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const exportImages = () => {
-    if (!hasAccess('image_generation') || images.length === 0) return;
-
-    images.forEach((img, index) => {
-      const a = document.createElement('a');
-      a.href = img;
-      a.download = `generated-image-${index + 1}.png`;
-      a.click();
-    });
-  };
-
-  return (
-    <div className="space-y-2 p-4 border rounded-lg">
-      <h3 className="font-medium">Export Options</h3>
-
-      <div className="flex flex-wrap gap-2">
-        <Button variant="outline" onClick={exportPlainText}>
-          <FileTextIcon className="mr-2 h-4 w-4" />
-          Plain Text
-        </Button>
-
-        {hasMarkdownAccess && (
-          <Button variant="outline" onClick={exportMarkdown}>
-            <MarkdownIcon className="mr-2 h-4 w-4" />
-            Markdown
-          </Button>
-        )}
-
-        {hasAllExportsAccess && (
-          <Button variant="outline" onClick={exportHTML}>
-            <CodeIcon className="mr-2 h-4 w-4" />
-            HTML
-          </Button>
-        )}
-
-        {images.length > 0 && (
-          <Button variant="outline" onClick={exportImages}>
-            <DownloadIcon className="mr-2 h-4 w-4" />
-            Images ({images.length})
-          </Button>
-        )}
-      </div>
-    </div>
-  );
-};
-
-export default ExportOptions;
-9. API Implementation
-##The following code is an example. Provide me with the actual code that fits my codebase and project structure. Provide guidance.##
-
-Implement the API endpoints for the new features:
-// lib/api.ts
-import { supabase } from './supabase';
-
-export const createCheckoutSession = async ({
-  priceId,
-  userId,
-  returnUrl,
-}: {
-  priceId: string;
-  userId: string;
-  returnUrl: string;
-}) => {
-  const { data, error } = await supabase.functions.invoke('create-checkout-session', {
-    body: { priceId, userId, returnUrl },
-  });
-
-  if (error) throw error;
-  return data;
-};
-
-export const generateImage = async ({
-  prompt,
-  highQuality = false,
-}: {
-  prompt: string;
-  highQuality?: boolean;
-}) => {
-  const { data, error } = await supabase.functions.invoke('generate-image', {
-    body: { prompt, highQuality },
-  });
-
-  if (error) throw error;
-  return data;
-};
-
-export const getUserSubscription = async () => {
-  const { data: user } = await supabase.auth.getUser();
-
-  if (!user.user) throw new Error('User not authenticated');
-
-  const { data, error } = await supabase
-    .from('users')
-    .select(`
-      subscription_tier,
-      credits_remaining,
-      credits_total,
-      subscription_start_date,
-      subscription_end_date,
-      stripe_subscription_id
-    `)
-    .eq('id', user.user.id)
-    .single();
-
-  if (error) throw error;
-
-  return {
-    tier: data.subscription_tier,
-    creditsRemaining: data.credits_remaining,
-    creditsTotal: data.credits_total,
-    startDate: data.subscription_start_date,
-    endDate: data.subscription_end_date,
-    stripeSubscriptionId: data.stripe_subscription_id,
-  };
-};
-
-export const getCreditHistory = async () => {
-  const { data: user } = await supabase.auth.getUser();
-
-  if (!user.user) throw new Error('User not authenticated');
-
-  const { data, error } = await supabase
-    .from('credit_transactions')
-    .select('*')
-    .eq('user_id', user.user.id)
-    .order('created_at', { ascending: false });
-
-  if (error) throw error;
-
-  return data;
-};
-Image Generation Function
-##The following code is an example. Provide me with the actual code that fits my codebase and project structure. Provide guidance.##
-
-// supabase/functions/generate-image/index.ts
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import OpenAI from 'https://esm.sh/openai@4.0.0'
-
-const openai = new OpenAI({
-  apiKey: Deno.env.get('OPENAI_API_KEY'),
-});
-
-serve(async (req) => {
-  // Handle CORS
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    }})
-  }
-
-  try {
-    const { prompt, highQuality } = await req.json()
-
-    // Generate image
-    const response = await openai.images.generate({
-      model: highQuality ? 'dall-e-3' : 'dall-e-2',
-      prompt,
-      n: 1,
-      size: highQuality ? '1024x1024' : '512x512',
-    });
-
-    const imageUrl = response.data[0].url;
-
-    return new Response(JSON.stringify({ imageUrl }), {
-      headers: { 'Content-Type': 'application/json' },
-    })
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    })
-  }
-})
-10. Integration with Existing App
-##The following code is an example. Provide me with the actual code that fits my codebase and project structure. Provide guidance.##
-
-Update the existing components to integrate with the subscription system:
-Update Form Component
-// components/CopywritingForm.tsx
-// Add credit check before submission
-
-import { useCredits } from '@/lib/hooks/useCredits';
-import { useRouter } from 'next/router';
+Credit Hook Implementation
+typescript
+Copy Code
+// src/hooks/useCredits.ts
 import { useState } from 'react';
-import { toast } from '@/components/ui/use-toast';
-import ModelSelector from '@/components/ModelSelector';
+import { useUser } from './useUser';
+import { supabase } from '@/lib/supabase';
 
-// ... existing imports and component code
+export const useCredits = () => {
+  const { user, subscription, mutate } = useUser();
+  const [isChecking, setIsChecking] = useState(false);
 
-const CopywritingForm = () => {
-  // ... existing state and handlers
+  const checkCredits = async (requiredCredits: number) => {
+    if (!user || !subscription) return false;
 
-  const [model, setModel] = useState('gpt-4o-mini');
-  const { checkCredits, useCredits } = useCredits();
-  const router = useRouter();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsSubmitting(true);
+    setIsChecking(true);
 
     try {
-      // Calculate required credits based on text length
-      let requiredCredits = 30; // Default for short copy
-
-      if (formData.textLength === 'medium') {
-        requiredCredits = 60;
-      } else if (formData.textLength === 'long') {
-        requiredCredits = 100;
-      } else if (formData.textLength === 'extra-long') {
-        requiredCredits = 150;
-      }
-
-      // Check if user has enough credits
-      const hasEnoughCredits = await checkCredits(requiredCredits);
-
-      if (!hasEnoughCredits) {
-        toast({
-          title: 'Not enough credits',
-          description: 'Please upgrade your plan or wait until your credits refresh.',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      // Submit form data to generate copy
-      const response = await fetch('/api/generate-copy', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...formData,
-          model,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to generate copy');
-      }
-
-      const data = await response.json();
-
-      // Use credits
-      await useCredits(
-        requiredCredits,
-        'text_generation',
-        { textLength: formData.textLength }
-      );
-
-      // Redirect to chat page
-      router.push(`/chat/${data.chatId}`);
+      const { creditsRemaining } = subscription;
+      return creditsRemaining >= requiredCredits;
     } catch (error) {
-      console.error('Error submitting form:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to generate copy. Please try again.',
-        variant: 'destructive',
-      });
+      console.error('Error checking credits:', error);
+      return false;
     } finally {
-      setIsSubmitting(false);
+      setIsChecking(false);
     }
   };
 
-  return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Existing form fields */}
+  const useCredits = async (amount: number, featureType: string, metadata = {}) => {
+    if (!user || !subscription) return false;
 
-      {/* Add model selector */}
-      <ModelSelector value={model} onChange={setModel} />
+    try {
+      // Check if user has enough credits
+      const hasEnough = await checkCredits(amount);
+      if (!hasEnough) return false;
 
-      <Button type="submit" disabled={isSubmitting} className="w-full">
-        {isSubmitting ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Generating...
-          </>
-        ) : (
-          'Generate Copywriting'
-        )}
-      </Button>
-    </form>
-  );
-};
-
-export default CopywritingForm;
-Update Chat Component
-##The following code is an example. Provide me with the actual code that fits my codebase and project structure. Provide guidance.##
-
-// components/Chat.tsx
-// Add credit check before sending messages and integrate new features
-
-import { useCredits } from '@/lib/hooks/useCredits';
-import { useState, useEffect } from 'react';
-import { toast } from '@/components/ui/use-toast';
-import ImageGenerator from '@/components/ImageGenerator';
-import ExportOptions from '@/components/ExportOptions';
-
-// ... existing imports and component code
-
-const Chat = ({ chatId }) => {
-  // ... existing state and handlers
-
-  const [generatedImages, setGeneratedImages] = useState<string[]>([]);
-  const { checkCredits, useCredits } = useCredits();
-
-  const handleSendMessage = async (message) => {
-    // Determine credit cost based on message length and expected response
-    let requiredCredits = 5; // Default for short clarification
-
-    if (message.length > 100) {
-      requiredCredits = 15; // Detailed feedback
-    }
-
-    // Check if user has enough credits
-    const hasEnoughCredits = await checkCredits(requiredCredits);
-
-    if (!hasEnoughCredits) {
-      toast({
-        title: 'Not enough credits',
-        description: 'Please upgrade your plan or wait until your credits refresh.',
-        variant: 'destructive',
+      // Deduct credits
+      const { data, error } = await supabase.rpc('use_credits', {
+        p_user_id: user.id,
+        p_amount: amount,
+        p_feature_type: featureType,
+        p_metadata: metadata
       });
-      return;
+
+      if (error) throw error;
+
+      // Update local subscription data
+      mutate();
+
+      return true;
+    } catch (error) {
+      console.error('Error using credits:', error);
+      return false;
     }
-
-    // Send message logic
-    // ...existing code
-
-    // Use credits after successful response
-    await useCredits(
-      requiredCredits,
-      'chat_interaction',
-      { messageLength: message.length }
-    );
   };
 
-  const handleImageGenerated = (imageUrl) => {
-    setGeneratedImages([...generatedImages, imageUrl]);
+  return {
+    checkCredits,
+    useCredits,
+    isChecking,
   };
-
-  return (
-    <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-y-auto p-4">
-        {/* Existing chat messages */}
-      </div>
-
-      {/* Add image generator */}
-      <div className="border-t">
-        <ImageGenerator
-          prompt={lastGeneratedCopy || ''}
-          onImageGenerated={handleImageGenerated}
-        />
-      </div>
-
-      {/* Add export options */}
-      <div className="border-t">
-        <ExportOptions
-          content={lastGeneratedCopy || ''}
-          images={generatedImages}
-        />
-      </div>
-
-      {/* Existing message input */}
-    </div>
-  );
 };
-
-export default Chat;
-Update Dashboard Component
-##The following code is an example. Provide me with the actual code that fits my codebase and project structure. Provide guidance.##
-
-// components/Dashboard.tsx
-// Add subscription and credit information
-
-import CreditDisplay from '@/components/CreditDisplay';
-import { Button } from '@/components/ui/button';
-import { useUser } from '@/lib/hooks/useUser';
-import Link from 'next/link';
-
-// ... existing imports and component code
-
-const Dashboard = () => {
-  // ... existing state and handlers
-
-  const { user, subscription } = useUser();
-
-  return (
-    <div className="container mx-auto py-10">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Subscription info */}
-        <div className="col-span-1 md:col-span-3">
-          <div className="p-6 border rounded-lg">
-            <h2 className="text-2xl font-bold mb-4">Welcome back, {user?.email}</h2>
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <div>
-                <p className="text-sm text-gray-500">Current Plan</p>
-                <p className="font-medium capitalize">{subscription?.tier || 'Free'}</p>
-              </div>
-
-              <CreditDisplay />
-
-              {subscription?.tier !== 'pro' && (
-                <Link href="/pricing">
-                  <Button>Upgrade Plan</Button>
-                </Link>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Existing dashboard content */}
-      </div>
-    </div>
-  );
-};
-
-export default Dashboard;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Stripe Subscription Implementation Guide
-Step-by-Step Implementation for AI Copywriting Web App
-Introduction
-This guide provides a comprehensive, step-by-step approach to implementing Stripe subscriptions and the required new features for the AI copywriting web app. The implementation will enable three subscription tiers (Free, Basic, Pro) with credit-based usage limits and additional features.
-Current App Overview
-The current app allows users to:
-• Complete a form with details (niche, product name, description, tone, target public, format, length, keywords, objective, language)
-• Generate AI-written copy based on the form input
-• Interact with the AI in a chat interface to refine the copy
-• Access chat history via a sidebar
-• Navigate through a dashboard to access forms, chats, and account settings
-Implementation Overview
-The implementation consists of four main components:
-1. Stripe Integration - Setting up subscription plans and payment processing
-2. Credit System - Tracking and managing user credits
-3. Feature Gating - Controlling access to features based on subscription tier
-4. New Features - Adding image generation, model selection, and export options
-1. Database Schema Updates
-First, update the Supabase database schema to support subscriptions and credits:
-##The following code is an example. Provide me with the actual code that fits my codebase. Provide guidance.##
--- Users table updates
-ALTER TABLE users ADD COLUMN subscription_tier VARCHAR(20) DEFAULT 'free';
-ALTER TABLE users ADD COLUMN credits_remaining INTEGER DEFAULT 100;
-ALTER TABLE users ADD COLUMN credits_total INTEGER DEFAULT 100;
-ALTER TABLE users ADD COLUMN subscription_start_date TIMESTAMP;
-ALTER TABLE users ADD COLUMN subscription_end_date TIMESTAMP;
-ALTER TABLE users ADD COLUMN stripe_customer_id VARCHAR(255);
-ALTER TABLE users ADD COLUMN stripe_subscription_id VARCHAR(255);
-
--- Create subscriptions table
-CREATE TABLE subscriptions (
-  id SERIAL PRIMARY KEY,
-  name VARCHAR(50) NOT NULL,
-  price_monthly DECIMAL(10,2) NOT NULL,
-  price_yearly DECIMAL(10,2) NOT NULL,
-  credits_per_month INTEGER NOT NULL,
-  max_chats INTEGER,
-  features JSONB,
-  stripe_price_id_monthly VARCHAR(255),
-  stripe_price_id_yearly VARCHAR(255),
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Create credit_transactions table
-CREATE TABLE credit_transactions (
-  id SERIAL PRIMARY KEY,
-  user_id UUID REFERENCES auth.users(id),
-  amount INTEGER NOT NULL,
-  transaction_type VARCHAR(50) NOT NULL,
-  description TEXT,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Create feature_usage table
-CREATE TABLE feature_usage (
-  id SERIAL PRIMARY KEY,
-  user_id UUID REFERENCES auth.users(id),
-  feature_type VARCHAR(50) NOT NULL,
-  credits_used INTEGER NOT NULL,
-  metadata JSONB,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-2. Stripe Setup
-
-For each step, give me detailed instructions.
-
-Set up Stripe products and prices:
-•	1. Create a Stripe account if you don't have one
-•	2. Install Stripe libraries: npm install @stripe/stripe-js @stripe/react-stripe-js stripe
-•	3. Set up Stripe products and prices in the Stripe dashboard or via API
-•	4. Configure webhook endpoints for handling subscription events
-
-##The following code is an example. Provide me with the actual code that fits my codebase and project structure. Provide guidance.##
-
-Stripe Product Setup Code
-// Example code for setting up Stripe products and prices via API
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-
-async function setupStripeProducts() {
-  // Create Basic product
-  const basicProduct = await stripe.products.create({
-    name: 'Basic Plan',
-    description: '2,000 credits/month, unlimited chats, ChatGPT-4o access',
-  });
-
-  // Create Basic price (monthly)
-  await stripe.prices.create({
-    product: basicProduct.id,
-    unit_amount: 999, // $9.99
-    currency: 'usd',
-    recurring: {
-      interval: 'month',
-    },
-    metadata: {
-      tier: 'basic',
-      credits: '2000',
-    },
-  });
-
-  // Create Pro product
-  const proProduct = await stripe.products.create({
-    name: 'Pro Plan',
-    description: '6,000 credits/month, advanced AI models, all export options',
-  });
-
-  // Create Pro price (monthly)
-  await stripe.prices.create({
-    product: proProduct.id,
-    unit_amount: 2499, // $24.99
-    currency: 'usd',
-    recurring: {
-      interval: 'month',
-    },
-    metadata: {
-      tier: 'pro',
-      credits: '6000',
-    },
-  });
-}
-3. Supabase Edge Functions for Stripe
-Create Supabase Edge Functions to handle Stripe interactions securely:
-##The following code is an example. Provide me with the actual code that fits my codebase and project structure. Provide guidance.##
-
-// supabase/functions/create-checkout-session/index.ts
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import Stripe from 'https://esm.sh/stripe@11.1.0?target=deno'
-
-const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') as string, {
-  httpClient: Stripe.createFetchHttpClient(),
-})
-
-serve(async (req) => {
-  // Handle CORS
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    }})
-  }
-
-  try {
-    const { priceId, userId, returnUrl } = await req.json()
-
-    // Create Supabase client
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') as string,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string
-    )
-
-    // Get user data
-    const { data: userData, error: userError } = await supabaseClient
-      .from('users')
-      .select('stripe_customer_id, email')
-      .eq('id', userId)
-      .single()
-
-    if (userError) throw userError
-
-    // Get or create Stripe customer
-    let customerId = userData.stripe_customer_id
-    if (!customerId) {
-      const { data: user } = await supabaseClient.auth.admin.getUserById(userId)
-
-      const customer = await stripe.customers.create({
-        email: user.user.email,
-        metadata: { userId },
-      })
-
-      customerId = customer.id
-
-      // Save Stripe customer ID
-      await supabaseClient
-        .from('users')
-        .update({ stripe_customer_id: customerId })
-        .eq('id', userId)
-    }
-
-    // Create checkout session
-    const session = await stripe.checkout.sessions.create({
-      customer: customerId,
-      line_items: [{ price: priceId, quantity: 1 }],
-      mode: 'subscription',
-      success_url: `${returnUrl}?success=true`,
-      cancel_url: `${returnUrl}?canceled=true`,
-      subscription_data: {
-        metadata: { userId },
-      },
-    })
-
-    return new Response(JSON.stringify({ url: session.url }), {
-      headers: { 'Content-Type': 'application/json' },
-    })
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    })
-  }
-})
-4. Stripe Webhook Handler
-
-Create a webhook handler to process Stripe events:
-
-##The following code is an example. Provide me with the actual code that fits my codebase and project structure. Provide guidance.##
-
-// supabase/functions/stripe-webhook/index.ts
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import Stripe from 'https://esm.sh/stripe@11.1.0?target=deno'
-
-const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') as string, {
-  httpClient: Stripe.createFetchHttpClient(),
-})
-const endpointSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET') as string
-
-serve(async (req) => {
-  const signature = req.headers.get('stripe-signature')
-  if (!signature) {
-    return new Response('Missing stripe-signature header', { status: 400 })
-  }
-
-  const body = await req.text()
-  let event
-
-  try {
-    event = stripe.webhooks.constructEvent(body, signature, endpointSecret)
-  } catch (err) {
-    return new Response(`Webhook Error: ${err.message}`, { status: 400 })
-  }
-
-  // Create Supabase client
-  const supabaseClient = createClient(
-    Deno.env.get('SUPABASE_URL') as string,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string
-  )
-
-  // Handle the event
-  switch (event.type) {
-    case 'customer.subscription.created':
-    case 'customer.subscription.updated': {
-      const subscription = event.data.object
-      const userId = subscription.metadata.userId
-
-      // Get subscription details
-      const { data: priceData } = await supabaseClient
-        .from('subscriptions')
-        .select('name, credits_per_month')
-        .eq('stripe_price_id_monthly', subscription.items.data[0].price.id)
-        .single()
-
-      if (!priceData) break
-
-      // Update user subscription
-      await supabaseClient
-        .from('users')
-        .update({
-          subscription_tier: priceData.name.toLowerCase(),
-          credits_remaining: priceData.credits_per_month,
-          credits_total: priceData.credits_per_month,
-          subscription_start_date: new Date(subscription.current_period_start * 1000).toISOString(),
-          subscription_end_date: new Date(subscription.current_period_end * 1000).toISOString(),
-          stripe_subscription_id: subscription.id
-        })
-        .eq('id', userId)
-
-      // Record credit transaction
-      await supabaseClient
-        .from('credit_transactions')
-        .insert({
-          user_id: userId,
-          amount: priceData.credits_per_month,
-          transaction_type: 'subscription_renewal',
-          description: `Credits from ${priceData.name} subscription`
-        })
-
-      break
-    }
-    case 'customer.subscription.deleted': {
-      const subscription = event.data.object
-      const userId = subscription.metadata.userId
-
-      // Update user to free tier
-      await supabaseClient
-        .from('users')
-        .update({
-          subscription_tier: 'free',
-          credits_remaining: 100,
-          credits_total: 100,
-          stripe_subscription_id: null
-        })
-        .eq('id', userId)
-
-      break
-    }
-  }
-
-  return new Response(JSON.stringify({ received: true }), {
-    headers: { 'Content-Type': 'application/json' },
-  })
-})
-5. Frontend Components
-Create React components for the subscription system:
-##The following code is an example. Provide me with the actual code that fits my codebase and project structure. Provide guidance.##
-
+4. Subscription Management UI
 Pricing Page Component
-// components/PricingPage.tsx
+tsx
+Copy Code
+// src/components/PricingPage.tsx
 import React from 'react';
 import { useUser } from '@/lib/hooks/useUser';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { CheckIcon } from 'lucide-react';
-import { createCheckoutSession } from '@/lib/api';
+import { createCheckoutSession, cancelSubscription } from '@/lib/api';
+import { toast } from '@/components/ui/use-toast';
 
 const PricingPage = () => {
   const { user, subscription } = useUser();
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubscribe = async (priceId: string) => {
     if (!user) {
-      // Redirect to sign in
+      toast({
+        title: 'Sign in required',
+        description: 'Please sign in to subscribe to a plan',
+        variant: 'destructive',
+      });
       return;
     }
 
+    setIsLoading(true);
+
     try {
-      const { url } = await createCheckoutSession({
+      const { url, error } = await createCheckoutSession({
         priceId,
         userId: user.id,
         returnUrl: window.location.origin + '/dashboard',
       });
 
+      if (error) {
+        toast({
+          title: 'Subscription Error',
+          description: error,
+          variant: 'destructive',
+        });
+        return;
+      }
+
       window.location.href = url;
     } catch (error) {
       console.error('Error creating checkout session:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to create checkout session. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCancelSubscription = async () => {
+    if (!user || !subscription?.stripeSubscriptionId) return;
+
+    setIsLoading(true);
+
+    try {
+      const { success, message, error } = await cancelSubscription({
+        userId: user.id,
+      });
+
+      if (error) {
+        toast({
+          title: 'Cancellation Error',
+          description: error,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      toast({
+        title: 'Subscription Canceled',
+        description: message,
+      });
+    } catch (error) {
+      console.error('Error canceling subscription:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to cancel subscription. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
     <div className="container mx-auto py-10">
       <h1 className="text-3xl font-bold text-center mb-10">Choose Your Plan</h1>
+
+      {subscription && subscription.tier !== 'free' && (
+        <div className="mb-8 p-4 border rounded-lg">
+          <h2 className="text-xl font-semibold mb-2">Current Subscription</h2>
+          <p>
+            You are currently on the <span className="font-medium capitalize">{subscription.tier}</span> plan.
+            Your subscription will {subscription.canCancel ? 'renew' : 'end'} on {new Date(subscription.endDate).toLocaleDateString()}.
+          </p>
+          {subscription.canCancel && (
+            <Button 
+              variant="outline" 
+              className="mt-4"
+              onClick={handleCancelSubscription}
+              disabled={isLoading}
+            >
+              Cancel Subscription
+            </Button>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {/* Free Plan */}
@@ -1773,7 +748,7 @@ const PricingPage = () => {
             <ul className="space-y-2">
               <li className="flex items-center">
                 <CheckIcon className="h-5 w-5 mr-2 text-green-500" />
-                <span>100 credits per month</span>
+                <span>200 credits per month</span>
               </li>
               <li className="flex items-center">
                 <CheckIcon className="h-5 w-5 mr-2 text-green-500" />
@@ -1797,7 +772,7 @@ const PricingPage = () => {
             <Button 
               variant="outline" 
               className="w-full"
-              disabled={subscription?.tier === 'free'}
+              disabled={subscription?.tier === 'free' || isLoading}
             >
               {subscription?.tier === 'free' ? 'Current Plan' : 'Get Started'}
             </Button>
@@ -1843,7 +818,7 @@ const PricingPage = () => {
             <Button 
               className="w-full"
               onClick={() => handleSubscribe('price_basic_monthly_id')}
-              disabled={subscription?.tier === 'basic'}
+              disabled={subscription?.tier === 'basic' || isLoading || (subscription?.tier !== 'free' && !subscription?.canCancel)}
             >
               {subscription?.tier === 'basic' ? 'Current Plan' : 'Subscribe'}
             </Button>
@@ -1885,7 +860,7 @@ const PricingPage = () => {
             <Button 
               className="w-full"
               onClick={() => handleSubscribe('price_pro_monthly_id')}
-              disabled={subscription?.tier === 'pro'}
+              disabled={subscription?.tier === 'pro' || isLoading || (subscription?.tier !== 'free' && !subscription?.canCancel)}
             >
               {subscription?.tier === 'pro' ? 'Current Plan' : 'Subscribe'}
             </Button>
@@ -1897,505 +872,10 @@ const PricingPage = () => {
 };
 
 export default PricingPage;
-Credit Display Component
-// components/CreditDisplay.tsx
-import React from 'react';
-import { Progress } from '@/components/ui/progress';
-import { useUser } from '@/lib/hooks/useUser';
-
-const CreditDisplay = () => {
-  const { subscription } = useUser();
-
-  if (!subscription) return null;
-
-  const { creditsRemaining, creditsTotal } = subscription;
-  const percentage = Math.round((creditsRemaining / creditsTotal) * 100);
-
-  return (
-    <div className="p-4 border rounded-lg">
-      <div className="flex justify-between items-center mb-2">
-        <h3 className="font-medium">Credits Remaining</h3>
-        <span className="text-sm">{creditsRemaining} / {creditsTotal}</span>
-      </div>
-      <Progress value={percentage} className="h-2" />
-      {percentage < 20 && (
-        <p className="text-sm text-red-500 mt-2">
-          You're running low on credits! Consider upgrading your plan.
-        </p>
-      )}
-    </div>
-  );
-};
-
-export default CreditDisplay;
-6. Credit System Implementation
-Implement the credit tracking and management system:
-##The following code is an example. Provide me with the actual code that fits my codebase and project structure. Provide guidance.##
-
-// lib/hooks/useCredits.ts
-import { useState } from 'react';
-import { useUser } from './useUser';
-import { supabase } from '@/lib/supabase';
-
-export const useCredits = () => {
-  const { user, subscription, mutate } = useUser();
-  const [isChecking, setIsChecking] = useState(false);
-
-  const checkCredits = async (requiredCredits: number) => {
-    if (!user || !subscription) return false;
-
-    setIsChecking(true);
-
-    try {
-      const { creditsRemaining } = subscription;
-
-      if (creditsRemaining < requiredCredits) {
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error('Error checking credits:', error);
-      return false;
-    } finally {
-      setIsChecking(false);
-    }
-  };
-
-  const useCredits = async (amount: number, featureType: string, metadata = {}) => {
-    if (!user || !subscription) return false;
-
-    try {
-      // Check if user has enough credits
-      const hasEnough = await checkCredits(amount);
-      if (!hasEnough) return false;
-
-      // Deduct credits
-      const { data, error } = await supabase.rpc('use_credits', {
-        p_user_id: user.id,
-        p_amount: amount,
-        p_feature_type: featureType,
-        p_metadata: metadata
-      });
-
-      if (error) throw error;
-
-      // Update local subscription data
-      mutate();
-
-      return true;
-    } catch (error) {
-      console.error('Error using credits:', error);
-      return false;
-    }
-  };
-
-  return {
-    checkCredits,
-    useCredits,
-    isChecking,
-  };
-};
-Database Function for Credit Usage
-##The following code is an example. Provide me with the actual code that fits my codebase and project structure. Provide guidance.##
-
--- Create a function to use credits
-CREATE OR REPLACE FUNCTION use_credits(
-  p_user_id UUID,
-  p_amount INTEGER,
-  p_feature_type VARCHAR(50),
-  p_metadata JSONB DEFAULT '{}'::JSONB
-)
-RETURNS BOOLEAN
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-  v_credits_remaining INTEGER;
-BEGIN
-  -- Get current credits
-  SELECT credits_remaining INTO v_credits_remaining
-  FROM users
-  WHERE id = p_user_id;
-
-  -- Check if user has enough credits
-  IF v_credits_remaining < p_amount THEN
-    RETURN FALSE;
-  END IF;
-
-  -- Update user's credits
-  UPDATE users
-  SET credits_remaining = credits_remaining - p_amount
-  WHERE id = p_user_id;
-
-  -- Record the transaction
-  INSERT INTO credit_transactions (
-    user_id,
-    amount,
-    transaction_type,
-    description
-  ) VALUES (
-    p_user_id,
-    -p_amount,
-    'usage',
-    'Used for ' || p_feature_type
-  );
-
-  -- Record feature usage
-  INSERT INTO feature_usage (
-    user_id,
-    feature_type,
-    credits_used,
-    metadata
-  ) VALUES (
-    p_user_id,
-    p_feature_type,
-    p_amount,
-    p_metadata
-  );
-
-  RETURN TRUE;
-END;
-$$;
-7. Feature Gating Implementation
-##The following code is an example. Provide me with the actual code that fits my codebase and project structure. Provide guidance.##
-
-Implement feature access control based on subscription tier:
-// lib/hooks/useFeatureAccess.ts
-import { useUser } from './useUser';
-
-type Feature = 
-  | 'unlimited_chats'
-  | 'image_generation'
-  | 'high_quality_images'
-  | 'advanced_models'
-  | 'unlimited_regenerations'
-  | 'markdown_export'
-  | 'all_exports';
-
-const featureMatrix: Record<string, Feature[]> = {
-  free: [],
-  basic: [
-    'unlimited_chats',
-    'image_generation',
-    'unlimited_regenerations',
-    'markdown_export'
-  ],
-  pro: [
-    'unlimited_chats',
-    'image_generation',
-    'high_quality_images',
-    'advanced_models',
-    'unlimited_regenerations',
-    'markdown_export',
-    'all_exports'
-  ]
-};
-
-export const useFeatureAccess = () => {
-  const { subscription } = useUser();
-  const tier = subscription?.tier || 'free';
-
-  const hasAccess = (feature: Feature) => {
-    return featureMatrix[tier].includes(feature);
-  };
-
-  const getAvailableModels = () => {
-    if (tier === 'pro') {
-      return ['gpt-4o-mini', 'gpt-4o', 'gpt-4.1'];
-    }
-    if (tier === 'basic') {
-      return ['gpt-4o-mini', 'gpt-4o'];
-    }
-    return ['gpt-4o-mini'];
-  };
-
-  const getMaxChats = () => {
-    if (tier === 'free') return 3;
-    return Infinity;
-  };
-
-  const getMaxRegenerations = () => {
-    if (tier === 'free') return 2;
-    return Infinity;
-  };
-
-  return {
-    hasAccess,
-    getAvailableModels,
-    getMaxChats,
-    getMaxRegenerations,
-  };
-};
-8. New Features Implementation
-##The following code is an example. Provide me with the actual code that fits my codebase and project structure. Provide guidance.##
-
-Implement the new features required for the subscription tiers:
-Model Selector Component
-// components/ModelSelector.tsx
-import React from 'react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useFeatureAccess } from '@/lib/hooks/useFeatureAccess';
-
-interface ModelSelectorProps {
-  value: string;
-  onChange: (value: string) => void;
-}
-
-const ModelSelector = ({ value, onChange }: ModelSelectorProps) => {
-  const { getAvailableModels } = useFeatureAccess();
-  const availableModels = getAvailableModels();
-
-  return (
-    <div className="space-y-2">
-      <label className="text-sm font-medium">AI Model</label>
-      <Select value={value} onValueChange={onChange}>
-        <SelectTrigger>
-          <SelectValue placeholder="Select model" />
-        </SelectTrigger>
-        <SelectContent>
-          {availableModels.map((model) => (
-            <SelectItem key={model} value={model}>
-              {model === 'gpt-4o-mini' && 'GPT-4o Mini'}
-              {model === 'gpt-4o' && 'GPT-4o'}
-              {model === 'gpt-4.1' && 'GPT-4.1 (Pro)'}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
-};
-
-export default ModelSelector;
-Image Generation Component
-##The following code is an example. Provide me with the actual code that fits my codebase and project structure. Provide guidance.##
-
-// components/ImageGenerator.tsx
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Loader2, ImageIcon } from 'lucide-react';
-import { useFeatureAccess } from '@/lib/hooks/useFeatureAccess';
-import { useCredits } from '@/lib/hooks/useCredits';
-import { generateImage } from '@/lib/api';
-
-interface ImageGeneratorProps {
-  prompt: string;
-  onImageGenerated: (imageUrl: string) => void;
-}
-
-const ImageGenerator = ({ prompt, onImageGenerated }: ImageGeneratorProps) => {
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const { hasAccess } = useFeatureAccess();
-  const { useCredits, checkCredits } = useCredits();
-
-  const hasImageAccess = hasAccess('image_generation');
-  const hasHighQualityAccess = hasAccess('high_quality_images');
-
-  const handleGenerateImage = async (highQuality: boolean) => {
-    setError(null);
-
-    // Check credits
-    const requiredCredits = highQuality ? 100 : 50;
-    const hasEnoughCredits = await checkCredits(requiredCredits);
-
-    if (!hasEnoughCredits) {
-      setError('Not enough credits to generate an image');
-      return;
-    }
-
-    setIsGenerating(true);
-
-    try {
-      // Generate image
-      const { imageUrl } = await generateImage({
-        prompt,
-        highQuality,
-      });
-
-      // Use credits
-      await useCredits(
-        requiredCredits,
-        'image_generation',
-        { prompt, highQuality }
-      );
-
-      onImageGenerated(imageUrl);
-    } catch (err) {
-      setError('Failed to generate image. Please try again.');
-      console.error(err);
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  if (!hasImageAccess) return null;
-
-  return (
-    <div className="space-y-2 p-4 border rounded-lg">
-      <h3 className="font-medium">Generate Image</h3>
-      <p className="text-sm text-gray-500">
-        Generate an image based on your text. Uses {hasHighQualityAccess ? '50-100' : '50'} credits.
-      </p>
-
-      <div className="flex gap-2">
-        <Button
-          variant="outline"
-          onClick={() => handleGenerateImage(false)}
-          disabled={isGenerating}
-        >
-          {isGenerating ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Generating...
-            </>
-          ) : (
-            <>
-              <ImageIcon className="mr-2 h-4 w-4" />
-              Generate Image
-            </>
-          )}
-        </Button>
-
-        {hasHighQualityAccess && (
-          <Button
-            onClick={() => handleGenerateImage(true)}
-            disabled={isGenerating}
-          >
-            High Quality
-          </Button>
-        )}
-      </div>
-
-      {error && <p className="text-sm text-red-500">{error}</p>}
-    </div>
-  );
-};
-
-export default ImageGenerator;
-Export Options Component
-##The following code is an example. Provide me with the actual code that fits my codebase and project structure. Provide guidance.##
-
-// components/ExportOptions.tsx
-import React from 'react';
-import { Button } from '@/components/ui/button';
-import { DownloadIcon, FileTextIcon, MarkdownIcon, CodeIcon } from 'lucide-react';
-import { useFeatureAccess } from '@/lib/hooks/useFeatureAccess';
-
-interface ExportOptionsProps {
-  content: string;
-  images: string[];
-}
-
-const ExportOptions = ({ content, images }: ExportOptionsProps) => {
-  const { hasAccess } = useFeatureAccess();
-
-  const hasMarkdownAccess = hasAccess('markdown_export');
-  const hasAllExportsAccess = hasAccess('all_exports');
-
-  const exportPlainText = () => {
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'copy-text.txt';
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const exportMarkdown = () => {
-    if (!hasMarkdownAccess) return;
-
-    const markdownContent = content;
-    const blob = new Blob([markdownContent], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'copy-text.md';
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const exportHTML = () => {
-    if (!hasAllExportsAccess) return;
-
-    const htmlContent = `<!DOCTYPE html>
-<html>
-<head>
-  <title>Exported Copy</title>
-  <style>
-    body { font-family: Arial, sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px; }
-    img { max-width: 100%; height: auto; margin: 20px 0; }
-  </style>
-</head>
-<body>
-  <div>${content.replace(/\n/g, '<br>')}</div>
-  ${images.map(img => `<img src="${img}" alt="Generated image" />`).join('')}
-</body>
-</html>`;
-
-    const blob = new Blob([htmlContent], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'copy-text.html';
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const exportImages = () => {
-    if (!hasAccess('image_generation') || images.length === 0) return;
-
-    images.forEach((img, index) => {
-      const a = document.createElement('a');
-      a.href = img;
-      a.download = `generated-image-${index + 1}.png`;
-      a.click();
-    });
-  };
-
-  return (
-    <div className="space-y-2 p-4 border rounded-lg">
-      <h3 className="font-medium">Export Options</h3>
-
-      <div className="flex flex-wrap gap-2">
-        <Button variant="outline" onClick={exportPlainText}>
-          <FileTextIcon className="mr-2 h-4 w-4" />
-          Plain Text
-        </Button>
-
-        {hasMarkdownAccess && (
-          <Button variant="outline" onClick={exportMarkdown}>
-            <MarkdownIcon className="mr-2 h-4 w-4" />
-            Markdown
-          </Button>
-        )}
-
-        {hasAllExportsAccess && (
-          <Button variant="outline" onClick={exportHTML}>
-            <CodeIcon className="mr-2 h-4 w-4" />
-            HTML
-          </Button>
-        )}
-
-        {images.length > 0 && (
-          <Button variant="outline" onClick={exportImages}>
-            <DownloadIcon className="mr-2 h-4 w-4" />
-            Images ({images.length})
-          </Button>
-        )}
-      </div>
-    </div>
-  );
-};
-
-export default ExportOptions;
-9. API Implementation
-##The following code is an example. Provide me with the actual code that fits my codebase and project structure. Provide guidance.##
-
-Implement the API endpoints for the new features:
-// lib/api.ts
+5. API Implementation
+typescript
+Copy Code
+// src/lib/api.ts
 import { supabase } from './supabase';
 
 export const createCheckoutSession = async ({
@@ -2407,363 +887,134 @@ export const createCheckoutSession = async ({
   userId: string;
   returnUrl: string;
 }) => {
-  const { data, error } = await supabase.functions.invoke('create-checkout-session', {
-    body: { priceId, userId, returnUrl },
-  });
+  try {
+    const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+      body: { priceId, userId, returnUrl },
+    });
 
-  if (error) throw error;
-  return data;
+    if (error) return { error: error.message };
+    return data;
+  } catch (error) {
+    console.error('API error in createCheckoutSession:', error);
+    return { error: 'Failed to create checkout session' };
+  }
 };
 
-export const generateImage = async ({
-  prompt,
-  highQuality = false,
+export const cancelSubscription = async ({
+  userId,
 }: {
-  prompt: string;
-  highQuality?: boolean;
+  userId: string;
 }) => {
-  const { data, error } = await supabase.functions.invoke('generate-image', {
-    body: { prompt, highQuality },
-  });
+  try {
+    const { data, error } = await supabase.functions.invoke('cancel-subscription', {
+      body: { userId },
+    });
 
-  if (error) throw error;
-  return data;
+    if (error) return { error: error.message };
+    return data;
+  } catch (error) {
+    console.error('API error in cancelSubscription:', error);
+    return { error: 'Failed to cancel subscription' };
+  }
 };
 
 export const getUserSubscription = async () => {
-  const { data: user } = await supabase.auth.getUser();
-
-  if (!user.user) throw new Error('User not authenticated');
-
-  const { data, error } = await supabase
-    .from('users')
-    .select(`
-      subscription_tier,
-      credits_remaining,
-      credits_total,
-      subscription_start_date,
-      subscription_end_date,
-      stripe_subscription_id
-    `)
-    .eq('id', user.user.id)
-    .single();
-
-  if (error) throw error;
-
-  return {
-    tier: data.subscription_tier,
-    creditsRemaining: data.credits_remaining,
-    creditsTotal: data.credits_total,
-    startDate: data.subscription_start_date,
-    endDate: data.subscription_end_date,
-    stripeSubscriptionId: data.stripe_subscription_id,
-  };
-};
-
-export const getCreditHistory = async () => {
-  const { data: user } = await supabase.auth.getUser();
-
-  if (!user.user) throw new Error('User not authenticated');
-
-  const { data, error } = await supabase
-    .from('credit_transactions')
-    .select('*')
-    .eq('user_id', user.user.id)
-    .order('created_at', { ascending: false });
-
-  if (error) throw error;
-
-  return data;
-};
-Image Generation Function
-##The following code is an example. Provide me with the actual code that fits my codebase and project structure. Provide guidance.##
-
-// supabase/functions/generate-image/index.ts
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import OpenAI from 'https://esm.sh/openai@4.0.0'
-
-const openai = new OpenAI({
-  apiKey: Deno.env.get('OPENAI_API_KEY'),
-});
-
-serve(async (req) => {
-  // Handle CORS
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    }})
-  }
-
   try {
-    const { prompt, highQuality } = await req.json()
+    const { data: user } = await supabase.auth.getUser();
 
-    // Generate image
-    const response = await openai.images.generate({
-      model: highQuality ? 'dall-e-3' : 'dall-e-2',
-      prompt,
-      n: 1,
-      size: highQuality ? '1024x1024' : '512x512',
-    });
+    if (!user.user) throw new Error('User not authenticated');
 
-    const imageUrl = response.data[0].url;
+    const { data, error } = await supabase
+      .from('users')
+      .select(`
+        subscription_tier,
+        credits_remaining,
+        credits_total,
+        subscription_start_date,
+        subscription_end_date,
+        stripe_subscription_id,
+        can_cancel
+      `)
+      .eq('id', user.user.id)
+      .single();
 
-    return new Response(JSON.stringify({ imageUrl }), {
-      headers: { 'Content-Type': 'application/json' },
-    })
+    if (error) throw error;
+
+    return {
+      tier: data.subscription_tier,
+      creditsRemaining: data.credits_remaining,
+      creditsTotal: data.credits_total,
+      startDate: data.subscription_start_date,
+      endDate: data.subscription_end_date,
+      stripeSubscriptionId: data.stripe_subscription_id,
+      canCancel: data.can_cancel
+    };
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    console.error('API error in getUserSubscription:', error);
+    return null;
   }
-})
-10. Integration with Existing App
-##The following code is an example. Provide me with the actual code that fits my codebase and project structure. Provide guidance.##
-
-Update the existing components to integrate with the subscription system:
-Update Form Component
-// components/CopywritingForm.tsx
-// Add credit check before submission
-
-import { useCredits } from '@/lib/hooks/useCredits';
-import { useRouter } from 'next/router';
-import { useState } from 'react';
-import { toast } from '@/components/ui/use-toast';
-import ModelSelector from '@/components/ModelSelector';
-
-// ... existing imports and component code
-
-const CopywritingForm = () => {
-  // ... existing state and handlers
-
-  const [model, setModel] = useState('gpt-4o-mini');
-  const { checkCredits, useCredits } = useCredits();
-  const router = useRouter();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-
-    try {
-      // Calculate required credits based on text length
-      let requiredCredits = 30; // Default for short copy
-
-      if (formData.textLength === 'medium') {
-        requiredCredits = 60;
-      } else if (formData.textLength === 'long') {
-        requiredCredits = 100;
-      } else if (formData.textLength === 'extra-long') {
-        requiredCredits = 150;
-      }
-
-      // Check if user has enough credits
-      const hasEnoughCredits = await checkCredits(requiredCredits);
-
-      if (!hasEnoughCredits) {
-        toast({
-          title: 'Not enough credits',
-          description: 'Please upgrade your plan or wait until your credits refresh.',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      // Submit form data to generate copy
-      const response = await fetch('/api/generate-copy', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...formData,
-          model,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to generate copy');
-      }
-
-      const data = await response.json();
-
-      // Use credits
-      await useCredits(
-        requiredCredits,
-        'text_generation',
-        { textLength: formData.textLength }
-      );
-
-      // Redirect to chat page
-      router.push(`/chat/${data.chatId}`);
-    } catch (error) {
-      console.error('Error submitting form:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to generate copy. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Existing form fields */}
-
-      {/* Add model selector */}
-      <ModelSelector value={model} onChange={setModel} />
-
-      <Button type="submit" disabled={isSubmitting} className="w-full">
-        {isSubmitting ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Generating...
-          </>
-        ) : (
-          'Generate Copywriting'
-        )}
-      </Button>
-    </form>
-  );
 };
+Avoiding Common Errors
+Preventing Deno Event Loop Errors
+The error you've been facing is related to Deno's event loop handling in Supabase Edge Functions. To avoid this error:
 
-export default CopywritingForm;
-Update Chat Component
-##The following code is an example. Provide me with the actual code that fits my codebase and project structure. Provide guidance.##
-
-// components/Chat.tsx
-// Add credit check before sending messages and integrate new features
-
-import { useCredits } from '@/lib/hooks/useCredits';
-import { useState, useEffect } from 'react';
-import { toast } from '@/components/ui/use-toast';
-import ImageGenerator from '@/components/ImageGenerator';
-import ExportOptions from '@/components/ExportOptions';
-
-// ... existing imports and component code
-
-const Chat = ({ chatId }) => {
-  // ... existing state and handlers
-
-  const [generatedImages, setGeneratedImages] = useState<string[]>([]);
-  const { checkCredits, useCredits } = useCredits();
-
-  const handleSendMessage = async (message) => {
-    // Determine credit cost based on message length and expected response
-    let requiredCredits = 5; // Default for short clarification
-
-    if (message.length > 100) {
-      requiredCredits = 15; // Detailed feedback
-    }
-
-    // Check if user has enough credits
-    const hasEnoughCredits = await checkCredits(requiredCredits);
-
-    if (!hasEnoughCredits) {
-      toast({
-        title: 'Not enough credits',
-        description: 'Please upgrade your plan or wait until your credits refresh.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    // Send message logic
-    // ...existing code
-
-    // Use credits after successful response
-    await useCredits(
-      requiredCredits,
-      'chat_interaction',
-      { messageLength: message.length }
-    );
-  };
-
-  const handleImageGenerated = (imageUrl) => {
-    setGeneratedImages([...generatedImages, imageUrl]);
-  };
-
-  return (
-    <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-y-auto p-4">
-        {/* Existing chat messages */}
-      </div>
-
-      {/* Add image generator */}
-      <div className="border-t">
-        <ImageGenerator
-          prompt={lastGeneratedCopy || ''}
-          onImageGenerated={handleImageGenerated}
-        />
-      </div>
-
-      {/* Add export options */}
-      <div className="border-t">
-        <ExportOptions
-          content={lastGeneratedCopy || ''}
-          images={generatedImages}
-        />
-      </div>
-
-      {/* Existing message input */}
-    </div>
-  );
-};
-
-export default Chat;
-Update Dashboard Component
-##The following code is an example. Provide me with the actual code that fits my codebase and project structure. Provide guidance.##
-
-// components/Dashboard.tsx
-// Add subscription and credit information
-
-import CreditDisplay from '@/components/CreditDisplay';
-import { Button } from '@/components/ui/button';
-import { useUser } from '@/lib/hooks/useUser';
-import Link from 'next/link';
-
-// ... existing imports and component code
-
-const Dashboard = () => {
-  // ... existing state and handlers
-
-  const { user, subscription } = useUser();
-
-  return (
-    <div className="container mx-auto py-10">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Subscription info */}
-        <div className="col-span-1 md:col-span-3">
-          <div className="p-6 border rounded-lg">
-            <h2 className="text-2xl font-bold mb-4">Welcome back, {user?.email}</h2>
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <div>
-                <p className="text-sm text-gray-500">Current Plan</p>
-                <p className="font-medium capitalize">{subscription?.tier || 'Free'}</p>
-              </div>
-
-              <CreditDisplay />
-
-              {subscription?.tier !== 'pro' && (
-                <Link href="/pricing">
-                  <Button>Upgrade Plan</Button>
-                </Link>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Existing dashboard content */}
-      </div>
-    </div>
-  );
-};
-
-export default Dashboard;
-
-
+Use Fetch-Based HTTP Clients:
+typescript
+Copy Code
+// CORRECT: Use fetch-based HTTP client
+const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') as string, {
+  httpClient: Stripe.createFetchHttpClient()
+});
+// INCORRECT: Don't use default HTTP client
+const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') as string);
+Avoid Node.js-specific APIs:
+Don't use process.nextTick() or other Node.js-specific event loop methods
+Don't import Node.js-specific modules that might use these methods
+Use Async/Await Consistently:
+Always use async/await for asynchronous operations
+Don't mix Promises and callbacks
+Avoid Nested Callbacks:
+Use Promise chaining or async/await instead of nested callbacks
+Handle Errors Properly:
+Always catch errors in async functions
+Return appropriate error responses
+Subscription Management Rules
+Prevent Multiple Active Subscriptions:
+Check for existing active subscriptions before allowing a new subscription
+Implement proper validation in the checkout session creation
+Subscription Cancellation:
+Allow users to cancel their subscription at any time
+When canceled, subscription remains active until the end of the billing period
+After cancellation, automatically downgrade to free tier
+No additional charges after cancellation
+Credit Management:
+Credits are allocated at the start of each billing period
+Credits are deducted for each feature usage
+Unused credits don't roll over to the next billing period
+Testing and Validation
+Test Cases
+Subscription Creation:
+User can subscribe to a plan
+Credits are allocated correctly
+Features are accessible based on the plan
+Credit Usage:
+Credits are deducted correctly for each feature
+User can't use features when out of credits
+Subscription Cancellation:
+User can cancel subscription
+User retains access until the end of the billing period
+User is downgraded to free tier after the billing period
+Webhook Handling:
+All Stripe events are processed correctly
+Database is updated accordingly
+Validation Steps
+Local Testing:
+Use Stripe CLI to simulate webhook events
+Test all subscription flows locally
+Staging Environment:
+Deploy to staging environment
+Test with Stripe test mode
+Production Deployment:
+Deploy to production
+Monitor logs for any errors
+Set up alerts for webhook failures
