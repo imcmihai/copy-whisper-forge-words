@@ -1,14 +1,50 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts' // Use a specific, stable version
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import Stripe from 'https://esm.sh/stripe@14.1.0?target=deno'
+// Remove Stripe SDK import
+// import Stripe from 'https://esm.sh/stripe@14.1.0?target=deno'
 
 
-// Initialize Stripe client with the secret key from environment variables
-// Ensure you have the correct types for Deno's environment variables
-const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') ?? '', {
-  httpClient: Stripe.createFetchHttpClient(),
-  apiVersion: '2023-10-16', // Specify API version
-})
+// Get Stripe secret key from environment variables
+const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY') ?? ''
+const stripeApiVersion = '2023-10-16' // Specify API version
+
+if (!stripeSecretKey) {
+  console.error("FATAL: STRIPE_SECRET_KEY environment variable not set.");
+  // Optionally exit or handle appropriately in a real deployment
+}
+
+// Helper function for making Stripe API calls
+// deno-lint-ignore no-explicit-any
+async function fetchStripeAPI(endpoint: string, method: string, body: Record<string, any> | null): Promise<any> {
+  const headers = {
+    'Authorization': `Bearer ${stripeSecretKey}`,
+    'Stripe-Version': stripeApiVersion,
+    'Content-Type': 'application/x-www-form-urlencoded', // Stripe uses form encoding
+  };
+
+  // Encode body as x-www-form-urlencoded
+  const encodedBody = body
+    ? Object.entries(body)
+        .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+        .join('&')
+    : undefined;
+
+  const response = await fetch(`https://api.stripe.com${endpoint}`, {
+    method,
+    headers,
+    body: encodedBody,
+  });
+
+  const responseJson = await response.json();
+
+  if (!response.ok) {
+    console.error(`Stripe API Error (${response.status}):`, responseJson.error?.message || responseJson);
+    throw new Error(`Stripe API Error: ${responseJson.error?.message || 'Unknown error'}`);
+  }
+
+  return responseJson;
+}
+
 
 // Define CORS headers for response
 const corsHeaders = {
@@ -66,11 +102,12 @@ serve(async (req: Request) => {
           throw new Error('User email not found, cannot create Stripe customer.')
       }
 
-      // Create Stripe customer
-      const customer = await stripe.customers.create({
+      // Create Stripe customer using fetch
+      const customerPayload = {
         email: authUser.user.email,
-        metadata: { supabase_user_id: userId }, // Link Stripe customer back to Supabase user ID
-      })
+        'metadata[supabase_user_id]': userId, // Use bracket notation for metadata keys
+      };
+      const customer = await fetchStripeAPI('/v1/customers', 'POST', customerPayload);
       customerId = customer.id
 
       // IMPORTANT: Save the new Stripe Customer ID to the user's profile
@@ -86,20 +123,18 @@ serve(async (req: Request) => {
       }
     }
 
-    // Create Stripe Checkout Session
-    const session = await stripe.checkout.sessions.create({
+    // Create Stripe Checkout Session using fetch
+    const sessionPayload = {
       customer: customerId,
-      line_items: [{ price: priceId, quantity: 1 }],
+      'line_items[0][price]': priceId,
+      'line_items[0][quantity]': '1', // Ensure quantity is a string for form encoding
       mode: 'subscription',
       success_url: `${returnUrl}?session_id={CHECKOUT_SESSION_ID}&success=true`, // Include session ID for confirmation
       cancel_url: `${returnUrl}?canceled=true`,
-      // Metadata for the subscription (useful in webhooks)
-      subscription_data: {
-        metadata: { supabase_user_id: userId },
-      },
-      // Optionally allow promotion codes
-      allow_promotion_codes: true,
-    })
+      'subscription_data[metadata][supabase_user_id]': userId, // Use bracket notation
+      allow_promotion_codes: 'true', // Ensure boolean is string for form encoding
+    };
+    const session = await fetchStripeAPI('/v1/checkout/sessions', 'POST', sessionPayload);
 
     // Return the Checkout session URL
     return new Response(JSON.stringify({ url: session.url }), {
