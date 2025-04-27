@@ -18,6 +18,11 @@ const router = createBrowserRouter([
     path: '/auth', // Authentication route - Public
     element: <AuthPage />,
   },
+  {
+    path: '/', // Default protected route (e.g., redirect to dashboard)
+    // You might want a specific layout here or just navigate
+    element: <Index />, // Or navigate to /dashboard
+  },
 
   {
     // Protected Routes - All routes nested under here require authentication
@@ -27,11 +32,7 @@ const router = createBrowserRouter([
         path: '/profile', // Authentication route - Public
         element: <Profile />,
       },
-      {
-        path: '/', // Default protected route (e.g., redirect to dashboard)
-        // You might want a specific layout here or just navigate
-        element: <Index />, // Or navigate to /dashboard
-      },
+
       {
         path: '/dashboard',
         element: <Dashboard/>,
