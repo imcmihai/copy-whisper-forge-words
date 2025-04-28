@@ -310,22 +310,42 @@ serve(async (req: Request) => {
       case 'customer.subscription.created':
       case 'customer.subscription.updated': {
         // Assert the specific type for data.object
-        const subscription = event.data.object as StripeSubscription;
-        userId = subscription?.metadata?.supabase_user_id ?? null;
+        const eventSubscription = event.data.object as StripeSubscription;
+        const subscriptionId = eventSubscription?.id; // Get ID from the event
+
+        if (!subscriptionId) {
+          console.error('Subscription ID is missing in event data for', event.type);
+          break;
+        }
+
+        // Retrieve the full subscription object from Stripe
+        let fetchedSubscription: StripeSubscription | null = null;
+        try {
+          fetchedSubscription = await fetchStripeAPI(`/v1/subscriptions/${subscriptionId}`, 'GET') as StripeSubscription;
+          if (!fetchedSubscription) throw new Error("Subscription data received from API was null or undefined");
+        } catch (apiError) {
+          console.error(`Failed to retrieve subscription ${subscriptionId} from Stripe API for ${event.type}:`, apiError);
+          // Return 500 to indicate failure to process
+          return new Response(`Webhook Error: Failed to retrieve subscription ${subscriptionId}`, { status: 500 });
+        }
+
+        // Now use the fetchedSubscription for all subsequent logic
+        userId = fetchedSubscription?.metadata?.supabase_user_id ?? null;
         if (!userId) {
-            console.error('Missing supabase_user_id in subscription metadata for', event.type, subscription?.id);
-            break;
+            console.error('Missing supabase_user_id in fetched subscription metadata for', event.type, fetchedSubscription?.id);
+            break; // Cannot process without user ID
         }
 
-        // Add a null check for the subscription object itself
-        if (!subscription) {
-            console.error('Subscription object is missing in event data for', event.type);
-            break;
-        }
+        // Add a null check for the fetched subscription object itself (though caught above)
+        // Redundant check, kept for clarity if needed later
+        // if (!fetchedSubscription) {
+        //     console.error('Fetched subscription object is missing for', event.type);
+        //     break;
+        // }
 
-        const priceId = subscription?.items?.data[0]?.price?.id;
+        const priceId = fetchedSubscription?.items?.data[0]?.price?.id;
         if (!priceId) {
-            console.error('Could not find price ID in subscription items:', subscription?.id);
+            console.error('Could not find price ID in fetched subscription items:', fetchedSubscription?.id);
             break;
         }
 
@@ -345,34 +365,34 @@ serve(async (req: Request) => {
           // break; // Replaced break with return to give Stripe feedback
         }
 
-        // --- Safely handle dates ---
+        // --- Safely handle dates from fetchedSubscription ---
         let startDateISO: string | null = null;
         // Add null check before accessing properties
-        if (subscription && typeof subscription.current_period_start === 'number') {
+        if (fetchedSubscription && typeof fetchedSubscription.current_period_start === 'number') {
           try {
-            startDateISO = new Date(subscription.current_period_start * 1000).toISOString();
+            startDateISO = new Date(fetchedSubscription.current_period_start * 1000).toISOString();
           } catch (e) {
-            console.error(`Error converting start date timestamp ${subscription.current_period_start}:`, e);
+            console.error(`Error converting start date timestamp ${fetchedSubscription.current_period_start}:`, e);
           }
         } else {
-          console.warn(`Received invalid subscription.current_period_start: ${subscription?.current_period_start}`);
+          console.warn(`Received invalid fetchedSubscription.current_period_start: ${fetchedSubscription?.current_period_start}`);
         }
 
         let endDateISO: string | null = null;
         // Add null check before accessing properties
-        if (subscription && typeof subscription.current_period_end === 'number') {
+        if (fetchedSubscription && typeof fetchedSubscription.current_period_end === 'number') {
            try {
-             endDateISO = new Date(subscription.current_period_end * 1000).toISOString();
+             endDateISO = new Date(fetchedSubscription.current_period_end * 1000).toISOString();
            } catch(e) {
-             console.error(`Error converting end date timestamp ${subscription.current_period_end}:`, e);
+             console.error(`Error converting end date timestamp ${fetchedSubscription.current_period_end}:`, e);
            }
         } else {
-          console.warn(`Received invalid subscription.current_period_end: ${subscription?.current_period_end}`);
+          console.warn(`Received invalid fetchedSubscription.current_period_end: ${fetchedSubscription?.current_period_end}`);
         }
         // --- End Date Handling ---
 
-        // Access properties safely thanks to the StripeSubscription type
-        const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id;
+        // Access properties safely thanks to the fetchedSubscription
+        const customerId = typeof fetchedSubscription.customer === 'string' ? fetchedSubscription.customer : fetchedSubscription.customer.id;
 
         // Update user profile using the helper function and validated dates
         // Construct the base updates object
@@ -381,9 +401,9 @@ serve(async (req: Request) => {
           subscription_tier: planData.name.toLowerCase(),
           credits_remaining: planData.credits_per_month, // Reset credits on new/updated subscription
           credits_total: planData.credits_per_month,
-          // Safely access id
-          stripe_subscription_id: subscription.id,
-          // Use the correctly extracted customerId
+          // Safely access id from fetchedSubscription
+          stripe_subscription_id: fetchedSubscription.id,
+          // Use the correctly extracted customerId from fetchedSubscription
           stripe_customer_id: customerId
         };
 
@@ -414,10 +434,10 @@ serve(async (req: Request) => {
 
       case 'customer.subscription.deleted': {
         // Assert the specific type for data.object
-        const subscription = event.data.object as StripeSubscription;
-        userId = subscription?.metadata?.supabase_user_id ?? null;
+        const eventSubscription = event.data.object as StripeSubscription; // Keep using event data here is fine
+        userId = eventSubscription?.metadata?.supabase_user_id ?? null;
         if (!userId) {
-            console.error('Missing supabase_user_id in subscription metadata for customer.subscription.deleted', subscription?.id);
+            console.error('Missing supabase_user_id in subscription metadata for customer.subscription.deleted', eventSubscription?.id);
             break;
         }
 
