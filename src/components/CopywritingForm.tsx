@@ -11,10 +11,12 @@ import ModelSelector from '@/components/ModelSelector';
 import { toast } from '@/components/ui/use-toast';
 import { Wand2, SendHorizontal, Sparkles, Target, Mic, ListChecks, Scale, Key, Goal, Globe, LanguagesIcon, Loader2 } from 'lucide-react';
 
-// Define props interface (currently empty as onSuccess was removed)
-interface CopywritingFormProps { }
+// Define props interface
+interface CopywritingFormProps {
+  frameworkId: string; // Add the frameworkId prop
+}
 
-export const CopywritingForm: React.FC<CopywritingFormProps> = () => {
+export const CopywritingForm: React.FC<CopywritingFormProps> = ({ frameworkId }) => { // Destructure frameworkId
   const [input, setInput] = useState<CopywritingInput>({
     niche: '',
     productName: '',
@@ -90,8 +92,8 @@ export const CopywritingForm: React.FC<CopywritingFormProps> = () => {
       }
       }
 
-      // --- Call Generation (Pass model to fix linter error) ---
-      const payload: GenerateCopywritingPayload = { ...input, model };
+      // --- Call Generation (Pass model and frameworkId) ---
+      const payload: GenerateCopywritingPayload = { ...input, model, frameworkId }; // Include frameworkId here
       console.log('Submitting form with payload:', payload);
       await generateCopywriting(payload); 
       // If generateCopywriting doesn't throw error, assume success

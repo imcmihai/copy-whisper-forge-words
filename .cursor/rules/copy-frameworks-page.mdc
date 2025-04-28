@@ -1,0 +1,219 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+##1. Purpose
+To enhance the user experience and copy quality by allowing users to select a copywriting framework (e.g., AIDA, PAS, BAB) before filling out the copy generation form. This ensures that generated text follows a proven structure, and makes the process more intuitive and educational for users.
+
+##2. User Flow
+Current Flow:
+Dashboard → Form Page → Generated Copy Chat
+
+New Flow:
+Dashboard → Frameworks Page → Form Page → Generated Copy Chat
+
+Details:
+
+When a user clicks any “New Copy” button (from dashboard, chat history, or elsewhere), they are first taken to the Frameworks Page.
+On the Frameworks Page, the user selects a copywriting framework (e.g., AIDA, PAS, BAB, etc.).
+After selecting a framework, the user is taken to the Form Page, where they fill in the usual details (niche, product, tone, etc.).
+When the user submits the form, the selected framework’s prompt is injected into the main prompt sent to ChatGPT for text generation.
+The generated copy and chat refinement process remain unchanged.
+
+##3. Core Features
+a. Frameworks Page
+List of Frameworks: Display all available frameworks as cards or a list, each with a name, description, and example.
+Selection: User can select one framework before proceeding.
+Continue Button: After selection, user clicks “Continue” to proceed to the Form Page.
+
+-----------
+
+Framework names, descriptions and when to use(each of these frameworks will be objects, wich will include the afferent descriptions and use cases)
+
+1. AIDA (Attention, Interest, Desire, Action)
+Description:
+AIDA is a classic copywriting formula that guides readers through four key stages: grabbing their attention, building interest, creating desire, and prompting action.
+When to use:
+Use AIDA for landing pages, advertisements, email campaigns, and any copy where you want to lead your audience step-by-step toward taking a specific action, like signing up or making a purchase.
+
+2. PAS (Problem, Agitation, Solution)
+Description:
+PAS focuses on identifying your audience’s problem, intensifying the pain or urgency around it, and then presenting your product or service as the solution.
+When to use:
+Ideal for sales pages, email marketing, and social media posts where you want to connect emotionally with your audience and motivate them to act by solving a pressing problem.
+
+3. BAB (Before, After, Bridge)
+Description:
+BAB helps you show your audience the transformation your product or service can provide. You describe their current situation (Before), the improved future (After), and how your offering makes that change possible (Bridge).
+When to use:
+Great for product descriptions, landing pages, and testimonials—anywhere you want to highlight the positive change your solution brings.
+
+4. Feature-Advantage-Benefit (FAB)
+Description:
+FAB breaks down your product’s features, explains the advantages of those features, and then highlights the direct benefits to the user.
+When to use:
+Perfect for product pages, brochures, and presentations where you need to clearly communicate what your product does and why it matters to your audience.
+
+5. 4 Ps (Promise, Picture, Proof, Push)
+Description:
+The 4 Ps formula starts with a bold promise, paints a vivid picture of the results, provides proof to back up your claims, and ends with a strong call to action.
+When to use:
+Use this template for short ads, landing pages, and promotional emails where you want to quickly build trust and drive immediate action.
+
+6. Problem-Solution-Result
+Description:
+This template tells a mini-story: it presents a problem, explains how your product solves it, and shares the results achieved.
+When to use:
+Best for case studies, testimonials, and detailed product reviews—anywhere you want to demonstrate real-world impact and build credibility.
+
+7. How-To Template
+Description:
+The How-To template provides step-by-step instructions to help your audience achieve a specific goal or solve a problem, positioning your product as a helpful resource.
+When to use:
+Ideal for blog posts, guides, tutorials, and educational content where you want to teach your audience something practical and actionable.
+
+
+-----------
+
+b. Frameworks Data Structure
+Array of Objects: Each framework is an object with:
+id: Unique identifier (e.g., "aida")
+name: Framework name (e.g., "AIDA")
+description: Short explanation for users
+use case: the use cases specified above
+prompt: The prompt template for ChatGPT
+c. Prompt Injection
+The prompts for the frameworks should be dynamically injected in the prompt from the *generate-copywriting* supabase edge function, situated inside */supabase/generate-copywriting/index.tsx
+d. State Management
+The selected framework is stored in state (e.g., React context, Redux, or URL param) and passed to the form and chat components.
+
+###Folder structure
+
+├── .cursor/
+├── .vscode/
+├── node_modules/
+├── public/
+├── src/
+│   ├── components/
+│   ├── hooks/
+│   ├── integrations/
+│   ├── lib/
+│   ├── pages/
+│   ├── App.css
+│   ├── App.tsx
+│   ├── index.css
+│   ├── main.tsx
+│   ├── vite-env.d.ts
+├── supabase/
+├── .gitignore
+├── bun.lockb
+├── components.json
+├── deno.lock
+├── eslint.config.js
+├── index.html
+├── package-lock.json
+├── package.json
+├── postcss.config.js
+├── README.md
+├── tailwind.config.ts
+├── tsconfig.app.json
+├── tsconfig.json
+├── tsconfig.node.json
+├── vercel.json
+├── vite.config.ts
+
+
+
+##4. Technical Requirements
+Frontend:
+New FrameworksPage component
+Update “New Copy” buttons to route to /frameworks instead of /copywriting-form
+Store selected framework in state/context
+Pass selected framework to Form Page and then to the chat generation logic
+
+
+**Prompt Management:
+The prompts for the frameworks should be dynamically injected in the prompt from the *generate-copywriting* supabase edge function, situated inside */supabase/generate-copywriting/index.tsx
+
+##5. Example Frameworks Array
+
+
+const frameworks = [
+  {
+    id: "aida",
+    name: "AIDA",
+    description: "Attention, Interest, Desire, Action – a classic formula for persuasive copy.",
+    example: "Attention: Struggling to write copy? Interest: Our AI makes it easy...",
+    prompt: `
+Write a [text format] for [product name] targeting [target audience] using the AIDA framework.
+
+- Attention: [Grab attention]
+- Interest: [Build interest]
+- Desire: [Create desire]
+- Action: [Call to action]
+
+Tone: [tone]
+Keywords: [keywords]
+    `
+  },
+  // ...other frameworks
+];
+##6. Acceptance Criteria
+User is always taken to the Frameworks Page before the Form Page when starting a new copy.
+Frameworks Page displays all available frameworks with descriptions and examples.
+User cannot proceed to the Form Page without selecting a framework.
+The selected framework’s prompt is correctly injected into the main prompt for text generation.
+The generated copy follows the selected framework’s structure.
+The flow is seamless and intuitive, with clear navigation and state management.
+
+
+
+
+##7.Design Notes
+Frameworks Page should be visually engaging, with icons or illustrations for each framework.
+Provide tooltips or info modals for users who want to learn more about each framework.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Ensure accessibility and mobile responsivenes

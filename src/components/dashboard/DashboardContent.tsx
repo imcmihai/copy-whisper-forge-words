@@ -75,7 +75,7 @@ export function DashboardContent({ user, subscription }: DashboardContentProps) 
 
   // --- Event Handlers ---
   const handleCreateNewCopy = () => {
-    navigate('/copywriting-form');
+    navigate('/frameworks');
   };
 
   const handleGoToChats = () => {

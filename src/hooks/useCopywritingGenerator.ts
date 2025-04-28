@@ -22,6 +22,7 @@ export interface CopywritingInput {
 // Define the structure for the generation function arguments, including the model
 export interface GenerateCopywritingPayload extends CopywritingInput {
     model: string; // Add the selected model
+    frameworkId: string; // Add the frameworkId
 }
 
 // Helper function to save generated text and profile data for logged-in users
@@ -109,9 +110,10 @@ export const useCopywritingGenerator = () => {
       // Extract the generated text from the function's response data
       const generatedText = generatedData.generatedText;
 
-      // Extract input fields from payload for saving (excluding model)
+      // Extract input fields from payload for saving (excluding model and frameworkId)
       const inputFields: CopywritingInput = { ...payload };
-      delete (inputFields as any).model; // Remove model before saving to avoid type mismatch
+      delete (inputFields as any).model; // Remove model before saving
+      delete (inputFields as any).frameworkId; // Remove frameworkId before saving
 
       // If the user is logged in and we have their ID, save the data
       if (isLoggedIn && userId) {

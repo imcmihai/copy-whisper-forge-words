@@ -10,6 +10,7 @@ import Index from './pages/Index';
 import Profile from './pages/Profile';
 import GeneratedCopy from './pages/GeneratedCopy';
 import Dashboard from './pages/Dashboard';
+import FrameworksPage from './pages/FrameworksPage'; // Import the new FrameworksPage
 import { SidebarProvider } from '@/components/ui/sidebar'; // Import SidebarProvider
 // Import other layouts/pages as needed
 
@@ -45,7 +46,10 @@ const router = createBrowserRouter([
           </SidebarProvider>
         ),
       },
-
+      { // Add the route for the frameworks page BEFORE the copywriting form
+        path: '/frameworks',
+        element: <FrameworksPage />,
+      },
       {
         path: '/copywriting-form',
         element: <CopywritingFormPage />,

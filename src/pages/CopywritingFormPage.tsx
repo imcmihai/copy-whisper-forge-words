@@ -1,10 +1,26 @@
 import { CopywritingForm } from '@/components/CopywritingForm';
 import { Sparkles, LayoutDashboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
 
 const CopywritingFormPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const frameworkId = location.state?.frameworkId as string | undefined;
+
+  useEffect(() => {
+    if (!frameworkId) {
+      console.warn('No framework selected, redirecting to framework selection.');
+      navigate('/frameworks');
+    }
+  }, [frameworkId, navigate]);
+
+  if (!frameworkId) {
+    return null;
+  }
+
+  console.log("Framework ID received in form:", frameworkId);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#1A052E] to-[#2D0A4E] p-4 flex flex-col items-center justify-center relative">
@@ -29,7 +45,7 @@ const CopywritingFormPage = () => {
             </p>
           </div>
           
-          <CopywritingForm />
+          <CopywritingForm frameworkId={frameworkId} />
         </div>
       </div>
     </div>
