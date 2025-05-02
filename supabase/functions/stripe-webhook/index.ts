@@ -207,15 +207,30 @@ const corsHeaders = {
 // Helper function to update user profile data
 // deno-lint-ignore no-explicit-any
 const updateUserSubscription = async (supabaseAdmin: any, userId: string, updates: Record<string, any>) => {
-  const { error } = await supabaseAdmin
+  const {data} =  await supabaseAdmin.from('profiles').select('id').eq('user_id', userId).single()
+  if (data) {
+    const { error } = await supabaseAdmin
     .from('profiles') // Adjust table name if different
     .update(updates)
-    .eq('id', userId)
+    .eq('id', data.id)
 
-  if (error) {
-    console.error(`Error updating profile for user ${userId}:`, error)
-    throw new Error(`Failed to update user profile: ${error.message}`)
+    if (error) {
+      console.error(`Error updating profile for user ${userId}:`, error)
+      throw new Error(`Failed to update user profile: ${error.message}`)
+    }  
+  } else{
+    const { error } = await supabaseAdmin
+    .from('profiles') // Adjust table name if different
+    .insert({
+      ...updates,
+      user_id: userId
+    })
+    if (error) {
+      console.error(`Error updating profile for user ${userId}:`, error)
+      throw new Error(`Failed to update user profile: ${error.message}`)
+    }  
   }
+  
 }
 
 // Helper function to add a credit transaction
@@ -402,7 +417,7 @@ serve(async (req: Request) => {
           credits_remaining: planData.credits_per_month, // Reset credits on new/updated subscription
           credits_total: planData.credits_per_month,
           // Safely access id from fetchedSubscription
-          stripe_subscription_id: fetchedSubscription.id,
+          stripe_subscription_id: priceId, //fetchedSubscription.id,
           // Use the correctly extracted customerId from fetchedSubscription
           stripe_customer_id: customerId
         };

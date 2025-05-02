@@ -1,0 +1,101 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+##Database chema structure
+
+
+## Table: public.chat_history
+table public.chat_history {
+  id uuid [pk]
+  user_id uuid [ref: > auth.users.id]
+  title text
+  created_at timestamp
+  updated_at timestamp
+}
+
+## Table: public.chat_messages
+table public.chat_messages {
+  id uuid [pk]
+  chat_id uuid [ref: > public.chat_history.id]
+  content text
+  role text
+  created_at timestamp
+}
+
+## Table: public.copywriting_texts
+table public.copywriting_texts {
+  id uuid [pk]
+  niche text
+  product_name text
+  product_description text
+  generated_text text
+  created_at timestamp
+  user_id uuid [ref: > auth.users.id]
+}
+
+## Table: public.credit_transactions
+table public.credit_transactions {
+  id int [pk]
+  user_id uuid [ref: > auth.users.id]
+  amount int
+  transaction_type varchar
+  description text
+  created_at timestamp
+}
+
+## Table: public.feature_usage
+table public.feature_usage {
+  id int [pk]
+  user_id uuid [ref: > auth.users.id]
+  feature_type varchar
+  credits_used int
+  metadata jsonb
+  created_at timestamp
+}
+
+## Table: public.profiles
+table public.profiles {
+  id uuid [pk]
+  user_id uuid [ref: > auth.users.id]
+  niche text
+  product_name text
+  product_description text
+  created_at timestamp
+  updated_at timestamp
+  subscription_tier text
+  credits_remaining int
+  credits_total int
+  subscription_start_date timestamp
+  subscription_end_date timestamp
+  stripe_customer_id varchar
+  stripe_subscription_id varchar
+}
+
+## Table: public.subscriptions
+table public.subscriptions {
+  id int [pk]
+  name varchar
+  price_monthly numeric
+  credits_per_month int
+  max_chats int
+  features jsonb
+  stripe_price_id_monthly varchar
+  created_at timestamp
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

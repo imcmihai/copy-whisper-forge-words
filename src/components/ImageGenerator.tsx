@@ -25,14 +25,16 @@ const ImageGenerator = ({ prompt: basePrompt, onImageGenerated, disabled = false
   const { tier, hasAccess, getMaxImageGenerations } = useFeatureAccess(); // Get tier, access check, and limits
   const { useCredits: deductCredits, checkCredits, isChecking, isUsing } = useCredits(); // Get credit functions and states
 
-  const hasImageAccess = hasAccess('image_generation'); // Still relevant for paid tiers
-  const hasHighQualityAccess = hasAccess('high_quality_images');
+  const hasImageAccess = hasAccess('image_generation');
+
+  // Define fixed credit cost at component level
+  const requiredCredits = 120;
 
   // --- Check if limit reached for free tier ---
   const maxImages = getMaxImageGenerations();
   const isFreeTierLimitReached = tier === 'free' && usage && usage.imageGenerationCount >= maxImages;
 
-  const handleGenerateImage = async (highQuality: boolean) => {
+  const handleGenerateImage = async () => {
     setError(null); // Clear previous errors
     setGeneratedImageUrl(null); // Clear previous image on new attempt
     
@@ -53,8 +55,8 @@ const ImageGenerator = ({ prompt: basePrompt, onImageGenerated, disabled = false
         return;
     }
 
-    // Define credit cost based on quality (only applies to paid tiers)
-    const requiredCredits = highQuality ? 100 : 50; // Example costs
+    // Define fixed credit cost (only applies to paid tiers)
+    // const requiredCredits = 120; // Removed from here, defined at component level
 
     // --- Credit Check (for paid tiers) ---
     if (tier !== 'free') {
@@ -72,7 +74,6 @@ const ImageGenerator = ({ prompt: basePrompt, onImageGenerated, disabled = false
       // Call the API function to generate the image
       const { imageUrl } = await generateImage({
         prompt: finalPrompt,
-        highQuality,
       });
 
       if (!imageUrl) {
@@ -86,7 +87,7 @@ const ImageGenerator = ({ prompt: basePrompt, onImageGenerated, disabled = false
       const creditsUsed = await deductCredits(
         requiredCredits,
         'image_generation',
-            { prompt: finalPrompt.substring(0, 100), highQuality }
+            { prompt: finalPrompt.substring(0, 100) }
       );
       if (!creditsUsed) {
               creditsSuccessfullyHandled = false;
@@ -97,7 +98,7 @@ const ImageGenerator = ({ prompt: basePrompt, onImageGenerated, disabled = false
       } else {
           // Record usage for free tier
           console.log(`[ImageGenerator] User tier is free. Attempting to record feature usage...`);
-          const usageRecorded = await recordFeatureUsage('image_generation', { prompt: finalPrompt.substring(0, 100), highQuality });
+          const usageRecorded = await recordFeatureUsage('image_generation', { prompt: finalPrompt.substring(0, 100) });
           console.log(`[ImageGenerator] recordFeatureUsage returned: ${usageRecorded}`); // Log the result
           
           if (usageRecorded) {
@@ -137,7 +138,7 @@ const ImageGenerator = ({ prompt: basePrompt, onImageGenerated, disabled = false
      return <p className="text-sm text-muted-foreground p-4">Image generation requires a Basic or Pro plan.</p>;
   }
 
-  // Determine if the buttons should be disabled
+  // Determine if the button should be disabled
   const anyLoading = isGenerating || isChecking || isUsing || isLoadingUser || disabled;
   const isDisabled = anyLoading || (tier === 'free' && (isFreeTierLimitReached || freeGenerationDoneThisSession));
 
@@ -152,7 +153,7 @@ const ImageGenerator = ({ prompt: basePrompt, onImageGenerated, disabled = false
       <p className="text-sm text-purple-300/80">
         {tier === 'free' 
           ? `Free plan: ${freeTierDisplayCount}/${maxImages} generated.`
-          : `Generate an image based on your text. Uses ${hasHighQualityAccess ? '50-100' : '50'} credits.`}
+          : `Generate an image based on your text. Uses ${requiredCredits} credits.`}
       </p>
 
       <div className="space-y-1.5">
@@ -188,38 +189,21 @@ const ImageGenerator = ({ prompt: basePrompt, onImageGenerated, disabled = false
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2 mt-2">
+      <div className="flex mt-2">
         <Button
           variant="outline"
-          onClick={() => handleGenerateImage(false)}
+          onClick={() => handleGenerateImage()}
           disabled={isDisabled}
           size="sm"
           className="border-purple-500/30 text-purple-300 hover:bg-purple-500/20 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 rounded-md shadow-sm"
-          title={isDisabled && tier === 'free' ? `Free plan limit of ${maxImages} image reached` : (tier === 'free' ? 'Generate Image (Free Tier)' : 'Generate Image (50 Credits)')}
+          title={isDisabled && tier === 'free' ? `Free plan limit of ${maxImages} image reached` : (tier === 'free' ? 'Generate Image (Free Tier)' : `Generate Image (${requiredCredits} Credits)`)}
         >
-          {isGenerating && !hasHighQualityAccess ? (
+          {isGenerating ? (
             <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating...</>
           ) : (
-            <><ImageIcon className="mr-2 h-4 w-4" /> {tier === 'free' ? 'Generate Image' : 'Image (50 Credits)'}</>
+            <><ImageIcon className="mr-2 h-4 w-4" /> {tier === 'free' ? 'Generate Image' : `Generate (${requiredCredits} Credits)`}</>
           )}
         </Button>
-
-        {tier !== 'free' && hasHighQualityAccess && (
-          <Button
-            onClick={() => handleGenerateImage(true)}
-            disabled={isDisabled}
-            size="sm"
-            variant="default" 
-            className="bg-gradient-to-r from-[#FF2EE6]/80 to-[#00FFCC]/80 hover:opacity-90 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-opacity duration-200 rounded-md shadow-md"
-            title="Generate High Quality Image (100 Credits)"
-          >
-            {isGenerating && hasHighQualityAccess ? (
-                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating HQ...</>
-            ) : (
-                <>✨ High Quality (100 Credits)</>
-            )}
-          </Button>
-        )}
       </div>
 
       {error && <p className="text-sm text-destructive font-medium mt-2">{error}</p>}

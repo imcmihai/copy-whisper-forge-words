@@ -65,18 +65,18 @@ export const CopywritingForm: React.FC<CopywritingFormProps> = ({ frameworkId })
     }
     // --- End Check ---
 
-    // --- Credit Calculation ---
-    let requiredCredits = 30; // Default for short or unspecified
-    const lengthLower = input.textLength?.toLowerCase() || '';
-    if (lengthLower.includes('medium')) {
-      requiredCredits = 60;
-    } else if (lengthLower.includes('long')) {
-      requiredCredits = 100;
-    } else if (lengthLower.includes('extra') || lengthLower.includes('xl')) {
-      requiredCredits = 150;
-    } else if (lengthLower.includes('short')) {
-        requiredCredits = 30;
-    }
+    // --- Credit Calculation (Fixed Cost) ---
+    const requiredCredits = 20; // Fixed cost for initial generation
+    // const lengthLower = input.textLength?.toLowerCase() || '';
+    // if (lengthLower.includes('medium')) {
+    //   requiredCredits = 60;
+    // } else if (lengthLower.includes('long')) {
+    //   requiredCredits = 100;
+    // } else if (lengthLower.includes('extra') || lengthLower.includes('xl')) {
+    //   requiredCredits = 150;
+    // } else if (lengthLower.includes('short')) {
+    //     requiredCredits = 30;
+    // }
 
     try {
       // --- Credit Check (Applies to paid tiers primarily now) ---
@@ -96,23 +96,39 @@ export const CopywritingForm: React.FC<CopywritingFormProps> = ({ frameworkId })
       const payload: GenerateCopywritingPayload = { ...input, model, frameworkId }; // Include frameworkId here
       console.log('Submitting form with payload:', payload);
       await generateCopywriting(payload); 
-      // If generateCopywriting doesn't throw error, assume success
+      // --- If generateCopywriting was successful, we proceed ---
 
-      // --- Deduct Credits (Only for non-free tiers) ---
+      // --- Deduct Credits (Only for non-free tiers AFTER successful generation) ---
+      let creditsAttempted = false;
       if (tier !== 'free') {
-      const creditsWereUsed = await deductCredits(
-          requiredCredits, 
-          'text_generation', 
-          { textLength: input.textLength, model } // Include model in metadata
-      );
+        creditsAttempted = true; // Mark that we tried to deduct credits
+        const creditsWereUsed = await deductCredits(
+            requiredCredits, 
+            'text_generation', 
+            { textLength: input.textLength, model } // Include model in metadata
+        );
       
-      if (!creditsWereUsed) {
-          console.warn("Generation succeeded, but credit deduction failed post-operation.");
-              // Optional: Show a warning toast
-          }
+        if (!creditsWereUsed) {
+            console.warn("Generation succeeded, but credit deduction failed post-operation (e.g., race condition, insufficient credits detected server-side).");
+            // Optional: Show a warning toast to the user, but still allow them to proceed
+            // as the main operation (generation) was successful.
+            toast({
+              title: 'Warning: Credit Deduction Issue',
+              description: 'Copy generated, but failed to deduct credits. Please check your balance or contact support if this persists.',
+              variant: 'default', // Or a custom warning variant
+            });
+        } else {
+            console.log("Credits deducted successfully post-generation.");
+        }
       }
 
-      console.log("Copy generation process initiated.");
+      console.log("Copy generation and credit deduction (if applicable) process completed.");
+      
+      // IMPORTANT: Navigation should happen here *after* generation and credit deduction attempt.
+      // If `generateCopywriting` navigates internally on success, this line might be redundant
+      // or need adjustment based on how that hook signals completion.
+      // Assuming generateCopywriting *doesn't* navigate internally for this example:
+      // navigate('/generated-copy'); // Or wherever the generated copy is shown
 
     } catch (error) {
       console.error('Error during form submission process:', error);
@@ -121,7 +137,10 @@ export const CopywritingForm: React.FC<CopywritingFormProps> = ({ frameworkId })
         description: error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.',
         variant: 'destructive',
       });
-    }
+      // No navigation happens if there's an error during check or generation
+    } 
+    // No finally block needed to reset isLoading, as the hooks manage their own states,
+    // and navigation will unmount the component anyway.
   };
 
   const inputClassName = "bg-[#3a1465]/40 border-purple-500/30 text-white placeholder:text-gray-400 focus-visible:ring-[#FF2EE6] backdrop-blur-md";

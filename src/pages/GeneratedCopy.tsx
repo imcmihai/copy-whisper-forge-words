@@ -239,7 +239,9 @@ const GeneratedCopy = () => {
   // Get authenticated user - ProtectedRoute ensures user exists if we reach here
   const { user: currentUser, usage, isLoading: isLoadingUser } = useUser(); 
   const { tier, getMaxMessagesPerChat, getMaxChats } = useFeatureAccess();
+  const { checkCredits, useCredits: deductCredits, isChecking: isCheckingCredits, isUsing: isUsingCredits } = useCredits(); // Get credit functions
   const [currentUserMessageCount, setCurrentUserMessageCount] = useState<number>(0);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false); // Added state for image generation loading
 
   // --- State Variables --- 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -251,9 +253,6 @@ const GeneratedCopy = () => {
   const [generatedImages, setGeneratedImages] = useState<string[]>([]);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   
-  // --- Hooks --- 
-  const { checkCredits, useCredits: deductCredits, isChecking, isUsing } = useCredits();
-
   // --- Data Loading Function (Moved Before Usage) --- 
   const loadMessagesForChat = useCallback(async (chatId: string) => {
       if (!currentUser) return;
@@ -403,7 +402,7 @@ const GeneratedCopy = () => {
   const handleSendMessage = useCallback(async (e: React.FormEvent) => {
      e.preventDefault();
      const trimmedInput = inputValue.trim();
-     const currentlyProcessing = isRevising || isChecking || isUsing || deleteChatMutation.isPending || isLoadingUser;
+     const currentlyProcessing = isRevising || isCheckingCredits || isUsingCredits || deleteChatMutation.isPending || isLoadingUser;
 
      // --- Added Robust Check --- 
      // Prevent sending if:
@@ -447,16 +446,16 @@ const GeneratedCopy = () => {
      }
      // --- End Check ---
 
-     // --- Credit Calculation (Only relevant if paid tiers use credits for chat) --- 
-     let requiredCredits = 0; // Assume 0 credits for chat messages unless defined otherwise
-     // if (trimmedInput.length > 100) { requiredCredits = 15; } // Example credit logic if needed
+     // --- Credit Calculation (Chat Message/Revise) --- 
+     const requiredCredits = 5; // Fixed cost for chat messages/revisions
      
      // --- Credit Check (Only if requiredCredits > 0 and tier is not free) --- 
-     if (tier !== 'free' && requiredCredits > 0) {
-     const hasEnoughCredits = await checkCredits(requiredCredits);
-     if (!hasEnoughCredits) {
-         toast({ title: "Not enough credits", description: `Sending requires ${requiredCredits} credits.`, variant: "destructive" });
-         return; 
+     // The condition `requiredCredits > 0` is now always true, so it simplifies to checking the tier.
+     if (tier !== 'free') {
+         const hasEnoughCredits = await checkCredits(requiredCredits);
+         if (!hasEnoughCredits) {
+             toast({ title: "Not enough credits", description: `Sending requires ${requiredCredits} credits.`, variant: "destructive" });
+             return; 
          }
      }
 
@@ -482,10 +481,15 @@ const GeneratedCopy = () => {
        const assistantMessage: Message = { id: (Date.now() + 1).toString(), content: revisedText, isUser: false }; 
        setMessages(prev => [...prev, assistantMessage]);
 
-       // --- Deduct Credits (Only if requiredCredits > 0 and tier is not free) --- 
-       if (tier !== 'free' && requiredCredits > 0) {
-       const creditsWereUsed = await deductCredits(requiredCredits, 'chat_interaction', { messageLength: userMessage.length });
-       if (!creditsWereUsed) { console.warn("Revision succeeded, but credit deduction failed."); }
+       // --- Deduct Credits (Only if paid tier) --- 
+       if (tier !== 'free') {
+           const creditsWereUsed = await deductCredits(requiredCredits, 'chat_interaction', { chatId: currentChatId!, messageLength: userMessage.length }); // Pass chatId
+           if (!creditsWereUsed) { 
+               console.warn("Revision succeeded, but credit deduction failed."); 
+               toast({ title: "Warning", description: "Message sent, but failed to update credits.", variant: "default" });
+           } else {
+               console.log("Chat message credits deducted successfully.");
+           }
        }
 
        await saveMessagesForUser(currentChatId!, userMessage, revisedText); // Added non-null assertion for currentChatId
@@ -509,8 +513,8 @@ const GeneratedCopy = () => {
      navigate, 
      checkCredits, 
      deductCredits, 
-     isChecking, 
-     isUsing, 
+     isCheckingCredits, 
+     isUsingCredits, 
      isRevising, 
      deleteChatMutation.isPending, 
      tier,
@@ -559,7 +563,7 @@ const GeneratedCopy = () => {
       .reverse()
       .find(msg => !msg.isUser && !msg.content.startsWith('{"type":"image"') )
       ?.content || ''; 
-  const isProcessing = isLoadingMessages || isRevising || isChecking || isUsing || deleteChatMutation.isPending || isLoadingUser;
+  const isProcessing = isLoadingMessages || isRevising || isCheckingCredits || isUsingCredits || deleteChatMutation.isPending || isLoadingUser;
   const isInputDisabled = useMemo(() => {
     if (isProcessing) return true;
     if (tier === 'free') {
@@ -595,19 +599,21 @@ const GeneratedCopy = () => {
             <div className={`flex-1 flex overflow-hidden ${currentUser ? 'md:ml-4' : 'mx-auto'} max-w-full`}> 
                 {/* Chat Area (Left Column) */}
                 <div className={`flex-1 flex flex-col h-[calc(100vh-2rem)] max-w-4xl bg-[#1a052e]/60 rounded-xl border border-purple-500/20 shadow-lg overflow-hidden`}>
-                {/* Top Bar */} 
-                <div className="p-2 sticky top-0 bg-[#1a052e]/80 backdrop-blur-sm z-20 flex items-center justify-between border-b border-purple-500/20"> 
-                <div className="md:hidden"> 
-                    <Button variant="ghost" size="icon" onClick={toggleSidebar} className="text-purple-300 hover:text-white hover:bg-purple-500/20" aria-label="Toggle chat history sidebar">
-                    <PanelLeft className="h-5 w-5" />
-                    </Button>
-                </div>
-                <div className="hidden md:block flex-1"></div> 
-                <Button variant="ghost" onClick={() => navigate('/dashboard')} className="text-purple-300 hover:text-white hover:bg-purple-500/20 flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm" title="Go to Dashboard">
-                    <LayoutDashboard className="h-5 w-5" />
-                    <span>Dashboard</span>
-                </Button>
-                </div>
+                    {/* Top Bar */} 
+                    <div className="p-2 sticky top-0 bg-[#1a052e]/80 backdrop-blur-sm z-20 flex items-center justify-between border-b border-purple-500/20"> 
+                        <div className="md:hidden"> 
+                            <Button variant="ghost" size="icon" onClick={toggleSidebar} className="text-purple-300 hover:text-white hover:bg-purple-500/20" aria-label="Toggle chat history sidebar">
+                            <PanelLeft className="h-5 w-5" />
+                            </Button>
+                        </div>
+                        {/* Placeholder for potential title or other elements */}
+                        <div className="hidden md:block flex-1"></div> 
+                        {/* Dashboard Button - Should be within the top bar div */}
+                        <Button variant="ghost" onClick={() => navigate('/dashboard')} className="text-purple-300 hover:text-white hover:bg-purple-500/20 flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm" title="Go to Dashboard">
+                            <LayoutDashboard className="h-5 w-5" />
+                            <span>Dashboard</span>
+                        </Button>
+                    </div> { /* This closing div was missing or misplaced */}
 
                     {/* Mobile Tool Triggers */} 
                     {showTools && (
@@ -693,7 +699,6 @@ const GeneratedCopy = () => {
                 </div>
 
                 {/* NEW: Right Sidebar (Tools) - Conditionally Rendered */}
-                {/* Render only if there is content to act upon */} 
                 {showTools && (
                     <div className="hidden md:flex md:flex-col ml-4 h-[calc(100vh-2rem)]">
                         <ChatToolsSidebar 
@@ -702,10 +707,11 @@ const GeneratedCopy = () => {
                             generatedImages={generatedImages}
                             isProcessing={isProcessing}
                             isInputDisabled={isInputDisabled} // Pass combined disabled state
-                            fileNamePrefix={currentChatFileNamePrefix}
-                    />
+                            fileNamePrefix={currentChatFileNamePrefix}/>
+                    
                     </div>
                 )}
+            
             </div>
         </div>
     </div>
