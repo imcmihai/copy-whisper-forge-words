@@ -72,20 +72,17 @@ export const createCheckoutSession = async ({
  * Invokes the Supabase Edge Function to generate an image.
  * @param {object} payload - The data to send to the function.
  * @param {string} payload.prompt - The prompt for image generation.
- * @param {boolean} [payload.highQuality=false] - Whether to request a high-quality image.
  * @returns {Promise<{ imageUrl: string }>} A promise resolving to the generated image URL.
  * @throws Will throw an error if the function invocation fails.
  */
 export const generateImage = async ({
   prompt,
-  highQuality = false,
 }: {
   prompt: string;
-  highQuality?: boolean;
 }): Promise<{ imageUrl: string }> => {
-  console.log('Invoking generate-image with:', { prompt: prompt.substring(0, 50) + '...', highQuality });
+  console.log('Invoking generate-image with prompt:', { prompt: prompt.substring(0, 50) + '...' });
   const { data, error } = await supabase.functions.invoke('generate-image', {
-    body: { prompt, highQuality },
+    body: { prompt },
   });
 
   if (error) {

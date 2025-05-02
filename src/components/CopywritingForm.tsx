@@ -102,13 +102,13 @@ export const CopywritingForm: React.FC<CopywritingFormProps> = ({ frameworkId })
       let creditsAttempted = false;
       if (tier !== 'free') {
         creditsAttempted = true; // Mark that we tried to deduct credits
-        const creditsWereUsed = await deductCredits(
-            requiredCredits, 
-            'text_generation', 
-            { textLength: input.textLength, model } // Include model in metadata
-        );
+      const creditsWereUsed = await deductCredits(
+          requiredCredits, 
+          'text_generation', 
+          { textLength: input.textLength, model } // Include model in metadata
+      );
       
-        if (!creditsWereUsed) {
+      if (!creditsWereUsed) {
             console.warn("Generation succeeded, but credit deduction failed post-operation (e.g., race condition, insufficient credits detected server-side).");
             // Optional: Show a warning toast to the user, but still allow them to proceed
             // as the main operation (generation) was successful.
@@ -138,7 +138,7 @@ export const CopywritingForm: React.FC<CopywritingFormProps> = ({ frameworkId })
         variant: 'destructive',
       });
       // No navigation happens if there's an error during check or generation
-    } 
+    }
     // No finally block needed to reset isLoading, as the hooks manage their own states,
     // and navigation will unmount the component anyway.
   };

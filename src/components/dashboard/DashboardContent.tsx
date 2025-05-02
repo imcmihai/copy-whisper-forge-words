@@ -102,6 +102,15 @@ export function DashboardContent({ user, subscription }: DashboardContentProps) 
                   </p>
               </div>
               
+              {/* Credits Display */}
+              <div className="bg-white/10 p-4 rounded-md">
+                  <p className="text-sm text-purple-300 mb-1">Credits Available</p>
+                  {/* Use optional chaining and nullish coalescing for safety */}
+                  <p className="font-semibold text-lg text-white">
+                      {subscription?.creditsRemaining ?? '-'} / {subscription?.creditsTotal ?? '-'}
+                  </p>
+              </div>
+              
               {/* Replace CreditDisplay with ActiveChatsDisplay */}
               <div className="md:col-span-1">
                   <ActiveChatsDisplay />

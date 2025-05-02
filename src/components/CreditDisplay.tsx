@@ -18,6 +18,11 @@ const CreditDisplay = ({ subscription }: CreditDisplayProps) => { // Destructure
     );
   }
 
+  // Conditionally render based on subscription tier
+  if (subscription.tier === 'free') {
+    return null; // Don't render anything for free users
+  }
+
   // Handle potential null values for credits defensively
   const creditsRemaining = typeof subscription.creditsRemaining === 'number' ? Math.max(0, subscription.creditsRemaining) : 0;
   const creditsTotal = typeof subscription.creditsTotal === 'number' ? Math.max(1, subscription.creditsTotal) : 0; // Avoid division by zero

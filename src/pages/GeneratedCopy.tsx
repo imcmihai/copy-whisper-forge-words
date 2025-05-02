@@ -252,7 +252,7 @@ const GeneratedCopy = () => {
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [generatedImages, setGeneratedImages] = useState<string[]>([]);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  
+
   // --- Data Loading Function (Moved Before Usage) --- 
   const loadMessagesForChat = useCallback(async (chatId: string) => {
       if (!currentUser) return;
@@ -452,10 +452,10 @@ const GeneratedCopy = () => {
      // --- Credit Check (Only if requiredCredits > 0 and tier is not free) --- 
      // The condition `requiredCredits > 0` is now always true, so it simplifies to checking the tier.
      if (tier !== 'free') {
-         const hasEnoughCredits = await checkCredits(requiredCredits);
-         if (!hasEnoughCredits) {
-             toast({ title: "Not enough credits", description: `Sending requires ${requiredCredits} credits.`, variant: "destructive" });
-             return; 
+     const hasEnoughCredits = await checkCredits(requiredCredits);
+     if (!hasEnoughCredits) {
+         toast({ title: "Not enough credits", description: `Sending requires ${requiredCredits} credits.`, variant: "destructive" });
+         return; 
          }
      }
 
@@ -523,7 +523,7 @@ const GeneratedCopy = () => {
      isLoadingUser
  ]);
 
-  const handleNewChat = useCallback(() => { navigate('/'); }, [navigate]);
+  const handleNewChat = useCallback(() => { navigate('/frameworks'); }, [navigate]);
   
   const handleDeleteChat = useCallback((chatId: string) => {
     if (!currentUser || deleteChatMutation.isPending) { return; }
@@ -599,20 +599,20 @@ const GeneratedCopy = () => {
             <div className={`flex-1 flex overflow-hidden ${currentUser ? 'md:ml-4' : 'mx-auto'} max-w-full`}> 
                 {/* Chat Area (Left Column) */}
                 <div className={`flex-1 flex flex-col h-[calc(100vh-2rem)] max-w-4xl bg-[#1a052e]/60 rounded-xl border border-purple-500/20 shadow-lg overflow-hidden`}>
-                    {/* Top Bar */} 
-                    <div className="p-2 sticky top-0 bg-[#1a052e]/80 backdrop-blur-sm z-20 flex items-center justify-between border-b border-purple-500/20"> 
-                        <div className="md:hidden"> 
-                            <Button variant="ghost" size="icon" onClick={toggleSidebar} className="text-purple-300 hover:text-white hover:bg-purple-500/20" aria-label="Toggle chat history sidebar">
-                            <PanelLeft className="h-5 w-5" />
-                            </Button>
-                        </div>
+                {/* Top Bar */} 
+                <div className="p-2 sticky top-0 bg-[#1a052e]/80 backdrop-blur-sm z-20 flex items-center justify-between border-b border-purple-500/20"> 
+                <div className="md:hidden"> 
+                    <Button variant="ghost" size="icon" onClick={toggleSidebar} className="text-purple-300 hover:text-white hover:bg-purple-500/20" aria-label="Toggle chat history sidebar">
+                    <PanelLeft className="h-5 w-5" />
+                    </Button>
+                </div>
                         {/* Placeholder for potential title or other elements */}
-                        <div className="hidden md:block flex-1"></div> 
+                <div className="hidden md:block flex-1"></div> 
                         {/* Dashboard Button - Should be within the top bar div */}
-                        <Button variant="ghost" onClick={() => navigate('/dashboard')} className="text-purple-300 hover:text-white hover:bg-purple-500/20 flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm" title="Go to Dashboard">
-                            <LayoutDashboard className="h-5 w-5" />
-                            <span>Dashboard</span>
-                        </Button>
+                <Button variant="ghost" onClick={() => navigate('/dashboard')} className="text-purple-300 hover:text-white hover:bg-purple-500/20 flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm" title="Go to Dashboard">
+                    <LayoutDashboard className="h-5 w-5" />
+                    <span>Dashboard</span>
+                </Button>
                     </div> { /* This closing div was missing or misplaced */}
 
                     {/* Mobile Tool Triggers */} 
