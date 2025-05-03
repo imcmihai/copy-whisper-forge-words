@@ -12,12 +12,24 @@ import GeneratedCopy from './pages/GeneratedCopy';
 import Dashboard from './pages/Dashboard';
 import FrameworksPage from './pages/FrameworksPage'; // Import the new FrameworksPage
 import { SidebarProvider } from '@/components/ui/sidebar'; // Import SidebarProvider
+import { Toaster } from '@/components/ui/toaster';
+import Auth from '@/pages/Auth';
+import ForgotPasswordForm from '@/components/auth/ForgotPasswordForm';
+import ResetPasswordForm from '@/components/auth/ResetPasswordForm';
 // Import other layouts/pages as needed
 
 const router = createBrowserRouter([
   {
     path: '/auth', // Authentication route - Public
     element: <AuthPage />,
+  },
+  {
+    path: '/forgot-password',
+    element: <ForgotPasswordForm />,
+  },
+  {
+    path: '/reset-password',
+    element: <ResetPasswordForm />,
   },
   {
     path: '/', // Default protected route (e.g., redirect to dashboard)
@@ -71,9 +83,10 @@ function App() {
   // QueryClientProvider should wrap the RouterProvider if using React Query
   // const queryClient = new QueryClient();
   return (
-     // <QueryClientProvider client={queryClient}>
-          <RouterProvider router={router} />
-     // </QueryClientProvider>
+    <>
+      <RouterProvider router={router} />
+      <Toaster />
+    </>
   );
 }
 
