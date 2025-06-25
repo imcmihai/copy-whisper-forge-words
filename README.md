@@ -3,6 +3,12 @@ Hi Nate! Hope you came across this file.
 
 I’m Mihai — a young builder who's serious about AI and automation. 
 
+## What I'll build for you
+
+In week one, I’ll fully implement the research and content-generation automations outlined in my email, so you won’t need to hunt for news or draft ideas manually. You’ll just review what the AI writes and hit publish.
+
+To optimize even further, I’ll map your current workflow: what tools you use, how you interact with your audience, where you source content for TikToks/Substack, and what takes up your time. From there, I’ll independently identify and prototype high-impact automations — whether it’s a mini CRM, a CMS-like post manager, scheduled social content, or smart filtering of DMs and emails. If it slows you down, I’ll try to speed it up.
+
 ## About this project
 
 Tech stack:
