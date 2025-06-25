@@ -19,3 +19,22 @@ https://copy-whisper-forge-words.vercel.app/
 
 ------
 
+**Here are some of the web-application that I have built.
+
+A Romanian Stocks monitor web-app that I have built a while ago
+
+https://stockwatcher-nest.lovable.app
+
+![image](https://github.com/user-attachments/assets/19b5031a-f339-4c87-b4fb-739bf226fb0f)
+![image](https://github.com/user-attachments/assets/1677ef7b-f655-497c-92cb-63517226a232)
+
+
+------
+Down below are some link to other applications that I have built. Unfortunately, they are not working, due to the fact that the core backend logic is inside Supabase Edge Functions and Supabase is limiting me to two projects: CopyAir and another one that I'm working on at the moment.
+
+
+https://underscore-blue.vercel.app/
+
+![image](https://github.com/user-attachments/assets/1ed4edc8-569f-410e-a006-bf304f9c461a)
+
+
