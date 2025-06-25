@@ -36,9 +36,9 @@ https://stockwatcher-nest.lovable.app
 
 
 ------
-Down below is a link to another application that I have built. Unfortunately, it is not working, due to the fact that the core backend logic is inside Supabase Edge Functions and Supabase is limiting me to two projects: CopyAir and another one that I'm working on at the moment.
 This application's core purpose is to break down the user's ideea and help him develop it, market it and find competitors, by giving instructions and tips.
 
+Disclaimer: It might not work due to the fact that I dont have much OpenAI credits left.
 https://underscore-blue.vercel.app/
 
 ![image](https://github.com/user-attachments/assets/1ed4edc8-569f-410e-a006-bf304f9c461a)
