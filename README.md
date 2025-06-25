@@ -30,8 +30,8 @@ https://stockwatcher-nest.lovable.app
 
 
 ------
-Down below are some link to other applications that I have built. Unfortunately, they are not working, due to the fact that the core backend logic is inside Supabase Edge Functions and Supabase is limiting me to two projects: CopyAir and another one that I'm working on at the moment.
-
+Down below is a link to another application that I have built. Unfortunately, it is not working, due to the fact that the core backend logic is inside Supabase Edge Functions and Supabase is limiting me to two projects: CopyAir and another one that I'm working on at the moment.
+This application's core purpose is to break down the user's ideea and help him develop it, market it and find competitors, by giving instructions and tips.
 
 https://underscore-blue.vercel.app/
 
