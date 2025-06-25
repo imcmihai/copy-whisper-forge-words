@@ -9,7 +9,9 @@ In week one, I’ll fully implement the research and content-generation automati
 
 To optimize even further, I’ll map your current workflow: what tools you use, how you interact with your audience, where you source content for TikToks/Substack, and what takes up your time. From there, I’ll independently identify and prototype high-impact automations — whether it’s a mini CRM, a CMS-like post manager, scheduled social content, or smart filtering of DMs and emails. If it slows you down, I’ll try to speed it up.
 
-## About this project
+## About this project (the one I think you should care about)
+
+Description: A copywriting tool that generates compelling copy based of the user's product and needs.
 
 Tech stack:
 React + Vite
@@ -25,7 +27,7 @@ https://copy-whisper-forge-words.vercel.app/
 
 ------
 
-**Here are some of the web-application that I have built.
+**Here are some of the other web-applications that I have built, which you can check out.
 
 A Romanian Stocks monitor web-app that I have built a while ago
 
